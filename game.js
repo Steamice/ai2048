@@ -253,10 +253,13 @@ class Game2048 {
                         tile.style.transition = 'left 0.15s ease, top 0.15s ease';
                     }
 
-                    const cellWidth = (this.gameBoard.offsetWidth - 36) / 4;
+                    const boardWidth = this.gameBoard.clientWidth;
+                    const padding = 12;
                     const gap = 12;
-                    tile.style.left = `${j * (cellWidth + gap) + gap}px`;
-                    tile.style.top = `${i * (cellWidth + gap) + gap}px`;
+                    const cellWidth = (boardWidth - 2 * padding - 3 * gap) / 4;
+                    tile.style.width = `${cellWidth}px`;
+                    tile.style.left = `${j * (cellWidth + gap) + padding}px`;
+                    tile.style.top = `${i * (cellWidth + gap) + padding}px`;
                 }
             }
         }
@@ -291,10 +294,13 @@ class Game2048 {
                     tile.textContent = cell.value;
                     tile.dataset.tileId = cell.id;
 
-                    const cellWidth = (this.gameBoard.offsetWidth - 36) / 4;
+                    const boardWidth = this.gameBoard.clientWidth;
+                    const padding = 12;
                     const gap = 12;
-                    tile.style.left = `${j * (cellWidth + gap) + gap}px`;
-                    tile.style.top = `${i * (cellWidth + gap) + gap}px`;
+                    const cellWidth = (boardWidth - 2 * padding - 3 * gap) / 4;
+                    tile.style.width = `${cellWidth}px`;
+                    tile.style.left = `${j * (cellWidth + gap) + padding}px`;
+                    tile.style.top = `${i * (cellWidth + gap) + padding}px`;
 
                     this.gameBoard.appendChild(tile);
                 }
@@ -315,7 +321,7 @@ class Game2048 {
                 for (let j = 0; j < this.size; j++) {
                     if (this.board[i][j].value === 2048) {
                         this.hasWon = true;
-                        if (confirm('Congratulations! You reached 2048! Do you want to continue playing?')) {
+                        if (confirm('恭喜！你达到了2048！继续游戏吗？')) {
                             continue;
                         } else {
                             this.startNewGame();
@@ -341,7 +347,7 @@ class Game2048 {
                 }
             }
         }
-        alert(`Game Over! Your score: ${this.score}`);
+        alert(`游戏结束！你的得分：${this.score}`);
         this.startNewGame();
     }
 
