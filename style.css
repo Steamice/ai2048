@@ -176,6 +176,36 @@ body {
     font-size: 24px;
 }
 
+.tile-4096 {
+    background: #5eda92;
+    color: #f9f6f2;
+    font-size: 22px;
+}
+
+.tile-8192 {
+    background: #3e6cff;
+    color: #f9f6f2;
+    font-size: 22px;
+}
+
+.tile-16384 {
+    background: #e84a5f;
+    color: #f9f6f2;
+    font-size: 20px;
+}
+
+.tile-32768 {
+    background: #1ec9d6;
+    color: #f9f6f2;
+    font-size: 20px;
+}
+
+.tile-65536 {
+    background: #9954e0;
+    color: #f9f6f2;
+    font-size: 18px;
+}
+
 .tile-new {
     animation: appear 0.2s ease;
 }

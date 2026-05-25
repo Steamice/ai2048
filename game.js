@@ -125,9 +125,14 @@ class Game2048 {
      * @returns {Array} - 4x4二维数组
      */
     createEmptyBoard() {
-        return Array(this.size).fill(null).map(() => 
-            Array(this.size).fill({ value: 0, id: null, isNew: false, isMerged: false })
-        );
+        const board = [];
+        for (let i = 0; i < this.size; i++) {
+            board[i] = [];
+            for (let j = 0; j < this.size; j++) {
+                board[i][j] = { value: 0, id: null, isNew: false, isMerged: false };
+            }
+        }
+        return board;
     }
 
     /**
