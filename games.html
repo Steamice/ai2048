@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小游戏合集 - 十款经典游戏</title>
+    <link rel="stylesheet" href="site.css">
+</head>
+<body>
+    <div class="site-container">
+        <header class="site-header">
+            <h1>🎮 小游戏合集</h1>
+            <p>十款经典小游戏，等你来挑战！</p>
+        </header>
+
+        <div class="games-grid" id="gamesGrid">
+            <div class="game-card" data-game="2048">
+                <div class="game-icon">2️⃣0️⃣4️⃣8️⃣</div>
+                <h3>2048</h3>
+                <p>合并数字，挑战2048</p>
+            </div>
+
+            <div class="game-card" data-game="snake">
+                <div class="game-icon">🐍</div>
+                <h3>贪吃蛇</h3>
+                <p>经典贪吃蛇游戏</p>
+            </div>
+
+            <div class="game-card" data-game="tetris">
+                <div class="game-icon">🧱</div>
+                <h3>俄罗斯方块</h3>
+                <p>经典方块消除游戏</p>
+            </div>
+
+            <div class="game-card" data-game="breakout">
+                <div class="game-icon">🏓</div>
+                <h3>打砖块</h3>
+                <p>经典弹球打砖块</p>
+            </div>
+
+            <div class="game-card" data-game="tic-tac-toe">
+                <div class="game-icon">⭕❌</div>
+                <h3>井字棋</h3>
+                <p>经典双人对战</p>
+            </div>
+
+            <div class="game-card" data-game="memory">
+                <div class="game-icon">🃏</div>
+                <h3>记忆翻牌</h3>
+                <p>挑战你的记忆力</p>
+            </div>
+
+            <div class="game-card" data-game="whack-a-mole">
+                <div class="game-icon">🔨</div>
+                <h3>打地鼠</h3>
+                <p>考验你的反应力</p>
+            </div>
+
+            <div class="game-card" data-game="sokoban">
+                <div class="game-icon">📦</div>
+                <h3>推箱子</h3>
+                <p>经典益智游戏</p>
+            </div>
+
+            <div class="game-card" data-game="guess-number">
+                <div class="game-icon">🔢</div>
+                <h3>数字猜谜</h3>
+                <p>猜数字小游戏</p>
+            </div>
+
+            <div class="game-card" data-game="match-three">
+                <div class="game-icon">💎</div>
+                <h3>消消乐</h3>
+                <p>三消小游戏</p>
+            </div>
+        </div>
+
+        <div class="game-modal" id="gameModal">
+            <div class="game-modal-content">
+                <button class="close-btn" id="closeBtn">← 返回</button>
+                <div class="game-content" id="gameContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="site.js"></script>
+</body>
+</html>
