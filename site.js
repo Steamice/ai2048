@@ -272,37 +272,61 @@ class GameSite {
     }
 }
 
+/**
+ * 2048 游戏类（站点版本）
+ * 在游戏合集中运行的2048游戏实现，支持键盘控制
+ */
 class Game2048ForSite {
+    /**
+     * 构造函数：初始化游戏状态和DOM元素
+     */
     constructor() {
-        this.size = 4;
-        this.board = [];
-        this.score = 0;
-        this.bestScore = this.loadBestScore();
+        this.size = 4;                          // 网格大小（4x4）
+        this.board = [];                        // 游戏棋盘数据
+        this.score = 0;                         // 当前得分
+        this.bestScore = this.loadBestScore();  // 历史最高分（从本地存储加载）
+        
+        // DOM元素引用
         this.gameBoard = document.getElementById('gameBoard2048');
         this.scoreElement = document.getElementById('score2048');
         this.bestScoreElement = document.getElementById('bestScore2048');
         this.newGameButton = document.getElementById('newGame2048');
-        this.hasWon = false;
-        this.tileIdCounter = 0;
-        this.tilePositions = {};
-        this.keyHandler = (e) => this.handleKeyDown(e);
-        this.init();
+        
+        this.hasWon = false;                    // 是否已达到2048
+        this.tileIdCounter = 0;                 // 方块ID计数器（用于动画追踪）
+        this.tilePositions = {};                // 方块位置映射（ID -> {row, col}）
+        
+        this.keyHandler = (e) => this.handleKeyDown(e); // 键盘事件处理器
+        this.init();                            // 初始化游戏
     }
 
+    /**
+     * 初始化游戏：设置事件监听器并开始新游戏
+     */
     init() {
         this.setupEventListeners();
         this.startNewGame();
     }
 
+    /**
+     * 设置事件监听器：新游戏按钮和键盘事件
+     */
     setupEventListeners() {
         this.newGameButton.addEventListener('click', () => this.startNewGame());
         document.addEventListener('keydown', this.keyHandler);
     }
 
+    /**
+     * 移除事件监听器（用于关闭游戏时清理）
+     */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyHandler);
     }
 
+    /**
+     * 处理键盘方向键事件
+     * @param {KeyboardEvent} e - 键盘事件对象
+     */
     handleKeyDown(e) {
         const keyMap = {
             ArrowUp: 'up',
@@ -311,22 +335,29 @@ class Game2048ForSite {
             ArrowRight: 'right'
         };
         if (keyMap[e.key]) {
-            e.preventDefault();
+            e.preventDefault();  // 阻止默认行为（如页面滚动）
             this.move(keyMap[e.key]);
         }
     }
 
+    /**
+     * 开始新游戏：重置所有状态并初始化棋盘
+     */
     startNewGame() {
         this.board = this.createEmptyBoard();
         this.score = 0;
         this.hasWon = false;
         this.tileIdCounter = 0;
         this.tilePositions = {};
+        this.addRandomTile();  // 初始生成两个方块
         this.addRandomTile();
-        this.addRandomTile();
-        this.updateUI();
+        this.updateUI();       // 更新界面显示
     }
 
+    /**
+     * 创建空棋盘（4x4网格）
+     * @returns {Array} - 4x4二维数组，每个单元格存储{value, id, isNew, isMerged}
+     */
     createEmptyBoard() {
         const board = [];
         for (let i = 0; i < this.size; i++) {
@@ -338,8 +369,13 @@ class Game2048ForSite {
         return board;
     }
 
+    /**
+     * 在随机空位添加新方块（90%概率为2，10%概率为4）
+     */
     addRandomTile() {
         const emptyCells = [];
+        
+        // 收集所有空格子坐标
         for (let i = 0; i < this.size; i++) {
             for (let j = 0; j < this.size; j++) {
                 if (this.board[i][j].value === 0) {
@@ -347,40 +383,63 @@ class Game2048ForSite {
                 }
             }
         }
+
+        // 如果有空格子，随机选择一个添加新方块
         if (emptyCells.length > 0) {
             const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
             this.tileIdCounter++;
+            
             this.board[randomCell.row][randomCell.col] = {
-                value: Math.random() < 0.9 ? 2 : 4,
+                value: Math.random() < 0.9 ? 2 : 4,  // 90%概率生成2，10%概率生成4
                 id: this.tileIdCounter,
-                isNew: true,
+                isNew: true,       // 标记为新方块（用于动画）
                 isMerged: false
             };
+            
+            // 记录方块位置
             this.tilePositions[this.tileIdCounter] = { row: randomCell.row, col: randomCell.col };
         }
     }
 
+    /**
+     * 处理方块移动逻辑
+     * @param {string} direction - 移动方向：'up', 'down', 'left', 'right'
+     */
     move(direction) {
-        let moved = false;
+        let moved = false;  // 标记是否有方块移动
+
+        /**
+         * 处理单行/列的移动和合并逻辑
+         * @param {Array} line - 一行或一列的方块数组
+         * @returns {Array} - 处理后的行/列
+         */
         const processLine = (line) => {
+            // 过滤掉空格子
             let newLine = line.filter(cell => cell.value !== 0);
+            
+            // 合并相邻相同数字的方块
             for (let i = 0; i < newLine.length - 1; i++) {
                 if (newLine[i].value === newLine[i + 1].value) {
-                    newLine[i].value *= 2;
-                    this.score += newLine[i].value;
-                    newLine[i].isMerged = true;
-                    newLine[i + 1].value = 0;
+                    newLine[i].value *= 2;          // 合并后数值翻倍
+                    this.score += newLine[i].value; // 更新得分
+                    newLine[i].isMerged = true;    // 标记为合并方块（用于动画）
+                    newLine[i + 1].value = 0;      // 被合并的方块置空
                     newLine[i + 1].id = null;
                     moved = true;
                 }
             }
+            
+            // 再次过滤（移除被合并的方块）
             newLine = newLine.filter(cell => cell.value !== 0);
+            
+            // 填充空格子使长度达到size
             while (newLine.length < this.size) {
                 newLine.push({ value: 0, id: null, isNew: false, isMerged: false });
             }
             return newLine;
         };
-        const originalPositions = { ...this.tilePositions };
+
+        // 根据方向处理每一行或列
         if (direction === 'left') {
             for (let i = 0; i < this.size; i++) {
                 const original = this.board[i].map(cell => cell.value);
@@ -428,15 +487,20 @@ class Game2048ForSite {
                 }
             }
         }
+
+        // 如果有移动发生
         if (moved) {
-            this.updateTilePositions();
-            this.addRandomTile();
-            this.updateUI();
-            this.checkWin();
-            this.checkGameOver();
+            this.updateTilePositions();  // 更新方块位置映射
+            this.addRandomTile();        // 添加新方块
+            this.updateUI();             // 更新界面
+            this.checkWin();             // 检查是否获胜
+            this.checkGameOver();        // 检查是否游戏结束
         }
     }
 
+    /**
+     * 更新方块位置映射
+     */
     updateTilePositions() {
         this.tilePositions = {};
         for (let i = 0; i < this.size; i++) {
@@ -448,29 +512,42 @@ class Game2048ForSite {
         }
     }
 
+    /**
+     * 更新游戏界面显示
+     */
     updateUI() {
         this.gameBoard.innerHTML = '';
+        
+        // 创建方块容器
         for (let i = 0; i < this.size * this.size; i++) {
             const container = document.createElement('div');
             container.className = 'tile-container';
             this.gameBoard.appendChild(container);
         }
+
+        // 渲染方块
         for (let i = 0; i < this.size; i++) {
             for (let j = 0; j < this.size; j++) {
                 const cell = this.board[i][j];
                 if (cell.id !== null) {
                     const tile = document.createElement('div');
                     tile.className = `tile tile-${cell.value}`;
+                    
+                    // 添加新方块动画类
                     if (cell.isNew) {
                         tile.classList.add('tile-new');
                         cell.isNew = false;
                     }
+                    // 添加合并动画类
                     if (cell.isMerged) {
                         tile.classList.add('tile-merged');
                         cell.isMerged = false;
                     }
+                    
                     tile.textContent = cell.value;
                     tile.dataset.tileId = cell.id;
+                    
+                    // 计算方块位置和大小
                     const boardWidth = this.gameBoard.clientWidth || 400;
                     const padding = 12;
                     const gap = 12;
@@ -478,10 +555,13 @@ class Game2048ForSite {
                     tile.style.width = `${cellWidth}px`;
                     tile.style.left = `${j * (cellWidth + gap) + padding}px`;
                     tile.style.top = `${i * (cellWidth + gap) + padding}px`;
+                    
                     this.gameBoard.appendChild(tile);
                 }
             }
         }
+
+        // 更新得分显示
         this.scoreElement.textContent = this.score;
         if (this.score > this.bestScore) {
             this.bestScore = this.score;
@@ -490,6 +570,9 @@ class Game2048ForSite {
         this.bestScoreElement.textContent = this.bestScore;
     }
 
+    /**
+     * 检查是否达到2048（获胜条件）
+     */
     checkWin() {
         if (!this.hasWon) {
             for (let i = 0; i < this.size; i++) {
@@ -508,11 +591,17 @@ class Game2048ForSite {
         }
     }
 
+    /**
+     * 检查是否游戏结束（无法继续移动）
+     */
     checkGameOver() {
         for (let i = 0; i < this.size; i++) {
             for (let j = 0; j < this.size; j++) {
+                // 如果有空格子，游戏未结束
                 if (this.board[i][j].value === 0) return;
+                // 如果右边有相同数字，游戏未结束
                 if (j < this.size - 1 && this.board[i][j].value === this.board[i][j + 1].value) return;
+                // 如果下边有相同数字，游戏未结束
                 if (i < this.size - 1 && this.board[i][j].value === this.board[i + 1][j].value) return;
             }
         }
@@ -520,37 +609,60 @@ class Game2048ForSite {
         this.startNewGame();
     }
 
+    /**
+     * 从本地存储加载最高分
+     * @returns {number} - 最高分
+     */
     loadBestScore() {
         const saved = localStorage.getItem('2048-best-score');
         return saved ? parseInt(saved, 10) : 0;
     }
 
+    /**
+     * 保存最高分到本地存储
+     * @param {number} score - 要保存的分数
+     */
     saveBestScore(score) {
         localStorage.setItem('2048-best-score', score.toString());
     }
 }
 
+/**
+ * 贪吃蛇游戏类
+ * 使用Canvas绘制，支持键盘方向键控制蛇的移动方向
+ */
 class SnakeGame {
+    /**
+     * 构造函数：初始化游戏状态和Canvas上下文
+     */
     constructor() {
         this.canvas = document.getElementById('snakeCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.gridSize = 20;
-        this.score = 0;
-        this.snake = [{x: 10, y: 10}];
-        this.direction = {x: 1, y: 0};
-        this.food = this.generateFood();
-        this.gameRunning = false;
-        this.gameLoop = null;
+        this.gridSize = 20;        // 每个格子的大小（像素）
+        this.score = 0;            // 当前得分
+        this.snake = [{x: 10, y: 10}]; // 蛇的身体（由多个段组成）
+        this.direction = {x: 1, y: 0}; // 移动方向（初始向右）
+        this.food = this.generateFood(); // 食物位置
+        this.gameRunning = false;  // 游戏是否正在运行
+        this.gameLoop = null;      // 游戏循环定时器
         this.keyHandler = (e) => this.handleKeyDown(e);
         this.init();
     }
 
+    /**
+     * 初始化方法：设置事件监听器并绘制初始画面
+     */
     init() {
         document.getElementById('snakeStart').addEventListener('click', () => this.startGame());
         document.addEventListener('keydown', this.keyHandler);
         this.draw();
     }
 
+    /**
+     * 处理键盘方向键事件
+     * 防止蛇反向移动（例如：向右时不能立即向左）
+     * @param {KeyboardEvent} e - 键盘事件对象
+     */
     handleKeyDown(e) {
         if (!this.gameRunning) return;
         const keyMap = {
@@ -562,6 +674,7 @@ class SnakeGame {
         if (keyMap[e.key]) {
             e.preventDefault();
             const newDir = keyMap[e.key];
+            // 如果蛇长度大于1，防止反向移动
             if (this.snake.length > 1) {
                 if (newDir.x !== -this.direction.x || newDir.y !== -this.direction.y) {
                     this.direction = newDir;
@@ -572,6 +685,9 @@ class SnakeGame {
         }
     }
 
+    /**
+     * 开始新游戏
+     */
     startGame() {
         if (this.gameRunning) return;
         this.snake = [{x: 10, y: 10}];
@@ -580,9 +696,13 @@ class SnakeGame {
         this.food = this.generateFood();
         this.gameRunning = true;
         document.getElementById('snakeScore').textContent = this.score;
-        this.gameLoop = setInterval(() => this.update(), 100);
+        this.gameLoop = setInterval(() => this.update(), 100); // 每100ms更新一次
     }
 
+    /**
+     * 在随机位置生成食物（确保不在蛇身上）
+     * @returns {Object} - 食物位置{x, y}
+     */
     generateFood() {
         let food;
         do {
@@ -594,40 +714,65 @@ class SnakeGame {
         return food;
     }
 
+    /**
+     * 更新游戏状态
+     * 移动蛇、检测碰撞、检测食物
+     */
     update() {
+        // 计算新的头部位置
         const head = {x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y};
+        
+        // 检测边界碰撞
         if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) {
             this.gameOver();
             return;
         }
+        
+        // 检测自身碰撞
         for (let segment of this.snake) {
             if (head.x === segment.x && head.y === segment.y) {
                 this.gameOver();
                 return;
             }
         }
+        
+        // 添加新头部
         this.snake.unshift(head);
+        
+        // 检测是否吃到食物
         if (head.x === this.food.x && head.y === this.food.y) {
             this.score += 10;
             document.getElementById('snakeScore').textContent = this.score;
-            this.food = this.generateFood();
+            this.food = this.generateFood(); // 生成新食物
         } else {
-            this.snake.pop();
+            this.snake.pop(); // 移除尾部（移动效果）
         }
-        this.draw();
+        
+        this.draw(); // 重新绘制画面
     }
 
+    /**
+     * 绘制游戏画面
+     */
     draw() {
+        // 清空画布（黑色背景）
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 绘制蛇（绿色）
         this.ctx.fillStyle = '#27ae60';
         for (let segment of this.snake) {
             this.ctx.fillRect(segment.x * this.gridSize, segment.y * this.gridSize, this.gridSize - 2, this.gridSize - 2);
         }
+        
+        // 绘制食物（红色）
         this.ctx.fillStyle = '#e74c3c';
         this.ctx.fillRect(this.food.x * this.gridSize, this.food.y * this.gridSize, this.gridSize - 2, this.gridSize - 2);
     }
 
+    /**
+     * 游戏结束处理
+     */
     gameOver() {
         this.gameRunning = false;
         clearInterval(this.gameLoop);
@@ -636,63 +781,90 @@ class SnakeGame {
         }, 50);
     }
 
+    /**
+     * 移除事件监听器
+     */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyHandler);
     }
 }
 
+/**
+ * 俄罗斯方块游戏类
+ * 使用Canvas绘制，支持键盘控制方块移动和旋转
+ */
 class TetrisGame {
+    /**
+     * 构造函数：初始化游戏状态和Canvas上下文
+     */
     constructor() {
         this.canvas = document.getElementById('tetrisCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.gridSize = 30;
-        this.cols = 10;
-        this.rows = 20;
-        this.board = [];
-        this.score = 0;
-        this.level = 1;
+        this.gridSize = 30;   // 每个格子的大小（像素）
+        this.cols = 10;       // 列数
+        this.rows = 20;       // 行数
+        this.board = [];      // 游戏面板
+        this.score = 0;       // 当前得分
+        this.level = 1;       // 当前等级
+        
+        // 七种标准俄罗斯方块形状（I、O、T、L、J、Z、S）
         this.pieces = [
-            [[1,1,1,1]],
-            [[1,1],[1,1]],
-            [[1,1,1],[0,1,0]],
-            [[1,1,1],[1,0,0]],
-            [[1,1,1],[0,0,1]],
-            [[1,1,0],[0,1,1]],
-            [[0,1,1],[1,1,0]]
+            [[1,1,1,1]],                        // I形
+            [[1,1],[1,1]],                      // O形
+            [[1,1,1],[0,1,0]],                  // T形
+            [[1,1,1],[1,0,0]],                  // L形
+            [[1,1,1],[0,0,1]],                  // J形
+            [[1,1,0],[0,1,1]],                  // Z形
+            [[0,1,1],[1,1,0]]                   // S形
         ];
+        
+        // 对应七种方块的颜色
         this.colors = ['#00f0f0', '#f0f000', '#a000f0', '#f0a000', '#0000f0', '#00f000', '#f00000'];
-        this.currentPiece = null;
-        this.currentPos = {x: 0, y: 0};
-        this.currentColor = '';
-        this.gameRunning = false;
-        this.gameLoop = null;
+        
+        this.currentPiece = null;    // 当前方块
+        this.currentPos = {x: 0, y: 0}; // 当前方块位置
+        this.currentColor = '';      // 当前方块颜色
+        this.gameRunning = false;    // 游戏是否正在运行
+        this.gameLoop = null;        // 游戏循环定时器
         this.keyHandler = (e) => this.handleKeyDown(e);
         this.init();
     }
 
+    /**
+     * 初始化方法：设置事件监听器
+     */
     init() {
         document.getElementById('tetrisStart').addEventListener('click', () => this.startGame());
         document.addEventListener('keydown', this.keyHandler);
     }
 
+    /**
+     * 处理键盘事件
+     * ← → 移动方块，↑ 旋转方块，↓ 加速下落
+     * @param {KeyboardEvent} e - 键盘事件对象
+     */
     handleKeyDown(e) {
         if (!this.gameRunning) return;
         if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            this.movePiece(-1, 0);
+            this.movePiece(-1, 0);  // 左移
         } else if (e.key === 'ArrowRight') {
             e.preventDefault();
-            this.movePiece(1, 0);
+            this.movePiece(1, 0);   // 右移
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();
-            this.movePiece(0, 1);
+            this.movePiece(0, 1);   // 下移
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            this.rotatePiece();
+            this.rotatePiece();     // 旋转
         }
     }
 
+    /**
+     * 开始新游戏
+     */
     startGame() {
+        // 初始化空白面板
         this.board = Array(this.rows).fill(null).map(() => Array(this.cols).fill(null));
         this.score = 0;
         this.level = 1;
@@ -700,26 +872,41 @@ class TetrisGame {
         document.getElementById('tetrisScore').textContent = this.score;
         document.getElementById('tetrisLevel').textContent = this.level;
         this.spawnPiece();
+        // 等级越高，下落速度越快（最低100ms）
         this.gameLoop = setInterval(() => this.update(), Math.max(100, 500 - (this.level - 1) * 50));
     }
 
+    /**
+     * 在顶部生成新方块
+     */
     spawnPiece() {
         const index = Math.floor(Math.random() * this.pieces.length);
         this.currentPiece = this.pieces[index].map(row => [...row]);
         this.currentColor = this.colors[index];
+        // 将方块放置在顶部中央
         this.currentPos = {x: Math.floor(this.cols / 2) - Math.floor(this.currentPiece[0].length / 2), y: 0};
+        
+        // 如果刚生成就碰撞，游戏结束
         if (this.checkCollision()) {
             this.gameOver();
         }
         this.draw();
     }
 
+    /**
+     * 移动方块
+     * @param {number} dx - x方向移动量
+     * @param {number} dy - y方向移动量
+     */
     movePiece(dx, dy) {
         this.currentPos.x += dx;
         this.currentPos.y += dy;
+        
+        // 检测碰撞
         if (this.checkCollision()) {
             this.currentPos.x -= dx;
             this.currentPos.y -= dy;
+            // 如果是向下移动时碰撞，锁定方块
             if (dy > 0) {
                 this.lockPiece();
             }
@@ -727,18 +914,29 @@ class TetrisGame {
         this.draw();
     }
 
+    /**
+     * 旋转方块（顺时针90度）
+     */
     rotatePiece() {
         if (!this.currentPiece) return;
         const oldPiece = this.currentPiece.map(row => [...row]);
+        
+        // 矩阵转置并反转每行实现顺时针旋转
         this.currentPiece = this.currentPiece[0].map((_, i) =>
             this.currentPiece.map(row => row[i]).reverse()
         );
+        
+        // 如果旋转后碰撞，恢复原来的形状
         if (this.checkCollision()) {
             this.currentPiece = oldPiece;
         }
         this.draw();
     }
 
+    /**
+     * 检测方块是否与边界或已固定方块碰撞
+     * @returns {boolean} - 是否发生碰撞
+     */
     checkCollision() {
         if (!this.currentPiece) return false;
         for (let y = 0; y < this.currentPiece.length; y++) {
@@ -746,7 +944,9 @@ class TetrisGame {
                 if (this.currentPiece[y][x]) {
                     const newX = this.currentPos.x + x;
                     const newY = this.currentPos.y + y;
+                    // 检测边界碰撞
                     if (newX < 0 || newX >= this.cols || newY >= this.rows) return true;
+                    // 检测与已固定方块碰撞
                     if (newY >= 0 && this.board[newY][newX]) return true;
                 }
             }
@@ -754,6 +954,9 @@ class TetrisGame {
         return false;
     }
 
+    /**
+     * 将当前方块固定到面板上
+     */
     lockPiece() {
         for (let y = 0; y < this.currentPiece.length; y++) {
             for (let x = 0; x < this.currentPiece[y].length; x++) {
@@ -762,37 +965,53 @@ class TetrisGame {
                 }
             }
         }
-        this.clearLines();
-        this.spawnPiece();
+        this.clearLines();  // 清除完整行
+        this.spawnPiece();  // 生成新方块
     }
 
+    /**
+     * 清除完整的行并更新得分和等级
+     */
     clearLines() {
         let linesCleared = 0;
+        // 从底部向上检查每一行
         for (let y = this.rows - 1; y >= 0; y--) {
             if (this.board[y].every(cell => cell !== null)) {
-                this.board.splice(y, 1);
-                this.board.unshift(Array(this.cols).fill(null));
+                this.board.splice(y, 1);           // 删除该行
+                this.board.unshift(Array(this.cols).fill(null)); // 在顶部添加空行
                 linesCleared++;
-                y++;
+                y++; // 重新检查当前行（因为上面的行已经下移）
             }
         }
+        
         if (linesCleared > 0) {
+            // 得分 = 消除行数 × 100 × 消除行数（连消加分）
             this.score += linesCleared * 100 * linesCleared;
             this.level = Math.floor(this.score / 500) + 1;
             document.getElementById('tetrisScore').textContent = this.score;
             document.getElementById('tetrisLevel').textContent = this.level;
+            // 更新游戏速度
             clearInterval(this.gameLoop);
             this.gameLoop = setInterval(() => this.update(), Math.max(100, 500 - (this.level - 1) * 50));
         }
     }
 
+    /**
+     * 游戏主循环：方块自动下落
+     */
     update() {
         this.movePiece(0, 1);
     }
 
+    /**
+     * 绘制游戏画面
+     */
     draw() {
+        // 清空画布（黑色背景）
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 绘制已固定的方块
         for (let y = 0; y < this.rows; y++) {
             for (let x = 0; x < this.cols; x++) {
                 if (this.board[y][x]) {
@@ -801,6 +1020,8 @@ class TetrisGame {
                 }
             }
         }
+        
+        // 绘制当前方块
         if (this.currentPiece) {
             this.ctx.fillStyle = this.currentColor;
             for (let y = 0; y < this.currentPiece.length; y++) {
@@ -813,45 +1034,73 @@ class TetrisGame {
         }
     }
 
+    /**
+     * 游戏结束处理
+     */
     gameOver() {
         this.gameRunning = false;
         clearInterval(this.gameLoop);
         alert(`游戏结束！得分：${this.score}`);
     }
 
+    /**
+     * 移除事件监听器
+     */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyHandler);
     }
 }
 
+/**
+ * 打砖块游戏类
+ * 使用Canvas绘制，支持键盘方向键控制挡板移动
+ */
 class BreakoutGame {
+    /**
+     * 构造函数：初始化游戏状态和Canvas上下文
+     */
     constructor() {
         this.canvas = document.getElementById('breakoutCanvas');
         this.ctx = this.canvas.getContext('2d');
+        
+        // 挡板属性
         this.paddle = {x: 175, y: 470, width: 60, height: 10, speed: 5};
+        
+        // 小球属性
         this.ball = {x: 200, y: 450, dx: 3, dy: -3, radius: 8};
-        this.bricks = [];
-        this.score = 0;
-        this.gameRunning = false;
-        this.keys = {};
+        
+        this.bricks = [];      // 砖块数组
+        this.score = 0;        // 当前得分
+        this.gameRunning = false; // 游戏是否正在运行
+        this.keys = {};        // 键盘状态追踪
+        
         this.keyDownHandler = (e) => { this.keys[e.key] = true; };
         this.keyUpHandler = (e) => { this.keys[e.key] = false; };
         this.init();
     }
 
+    /**
+     * 初始化方法：设置事件监听器
+     */
     init() {
         document.getElementById('breakoutStart').addEventListener('click', () => this.startGame());
         document.addEventListener('keydown', this.keyDownHandler);
         document.addEventListener('keyup', this.keyUpHandler);
     }
 
+    /**
+     * 开始新游戏
+     */
     startGame() {
+        // 创建砖块（5行8列）
         this.bricks = [];
         for (let row = 0; row < 5; row++) {
             for (let col = 0; col < 8; col++) {
                 this.bricks.push({x: col * 50 + 5, y: row * 25 + 30, width: 45, height: 20, alive: true});
             }
         }
+        
+        // 重置挡板和小球位置
         this.paddle.x = 175;
         this.ball.x = 200;
         this.ball.y = 450;
@@ -863,24 +1112,50 @@ class BreakoutGame {
         this.gameLoop();
     }
 
+    /**
+     * 游戏主循环（使用requestAnimationFrame实现流畅动画）
+     */
     gameLoop() {
         if (!this.gameRunning) return;
-        if (this.keys['ArrowLeft'] && this.paddle.x > 0) this.paddle.x -= this.paddle.speed;
-        if (this.keys['ArrowRight'] && this.paddle.x < this.canvas.width - this.paddle.width) this.paddle.x += this.paddle.speed;
+        
+        // 移动挡板
+        if (this.keys['ArrowLeft'] && this.paddle.x > 0) {
+            this.paddle.x -= this.paddle.speed;
+        }
+        if (this.keys['ArrowRight'] && this.paddle.x < this.canvas.width - this.paddle.width) {
+            this.paddle.x += this.paddle.speed;
+        }
+        
+        // 移动小球
         this.ball.x += this.ball.dx;
         this.ball.y += this.ball.dy;
-        if (this.ball.x <= 0 || this.ball.x >= this.canvas.width) this.ball.dx = -this.ball.dx;
-        if (this.ball.y <= 0) this.ball.dy = -this.ball.dy;
+        
+        // 检测边界碰撞（左右）
+        if (this.ball.x <= 0 || this.ball.x >= this.canvas.width) {
+            this.ball.dx = -this.ball.dx;
+        }
+        
+        // 检测边界碰撞（顶部）
+        if (this.ball.y <= 0) {
+            this.ball.dy = -this.ball.dy;
+        }
+        
+        // 检测边界碰撞（底部 - 游戏结束）
         if (this.ball.y >= this.canvas.height) {
             this.gameOver();
             return;
         }
+        
+        // 检测挡板碰撞
         if (this.ball.y + this.ball.radius >= this.paddle.y &&
             this.ball.x >= this.paddle.x &&
             this.ball.x <= this.paddle.x + this.paddle.width) {
             this.ball.dy = -Math.abs(this.ball.dy);
+            // 根据击中挡板的位置调整水平速度
             this.ball.dx += (this.ball.x - (this.paddle.x + this.paddle.width / 2)) / 20;
         }
+        
+        // 检测砖块碰撞
         for (let brick of this.bricks) {
             if (brick.alive &&
                 this.ball.x >= brick.x &&
@@ -893,23 +1168,36 @@ class BreakoutGame {
                 document.getElementById('breakoutScore').textContent = this.score;
             }
         }
+        
+        // 检测是否全部清除（胜利条件）
         if (this.bricks.every(b => !b.alive)) {
             this.gameWin();
             return;
         }
+        
         this.draw();
         requestAnimationFrame(() => this.gameLoop());
     }
 
+    /**
+     * 绘制游戏画面
+     */
     draw() {
+        // 清空画布（黑色背景）
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 绘制挡板（蓝色）
         this.ctx.fillStyle = '#3498db';
         this.ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.width, this.paddle.height);
+        
+        // 绘制小球（红色）
         this.ctx.fillStyle = '#e74c3c';
         this.ctx.beginPath();
         this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
         this.ctx.fill();
+        
+        // 绘制砖块（每行不同颜色）
         const colors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db'];
         for (let i = 0; i < this.bricks.length; i++) {
             const brick = this.bricks[i];
@@ -920,74 +1208,119 @@ class BreakoutGame {
         }
     }
 
+    /**
+     * 游戏结束处理
+     */
     gameOver() {
         this.gameRunning = false;
         alert(`游戏结束！得分：${this.score}`);
     }
 
+    /**
+     * 游戏胜利处理
+     */
     gameWin() {
         this.gameRunning = false;
         alert(`恭喜！你赢了！得分：${this.score}`);
     }
 
+    /**
+     * 移除事件监听器
+     */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyDownHandler);
         document.removeEventListener('keyup', this.keyUpHandler);
     }
 }
 
+/**
+ * 井字棋游戏类（双人对战）
+ * 使用DOM元素渲染棋盘，支持鼠标点击落子
+ */
 class TicTacToeGame {
+    /**
+     * 构造函数：初始化游戏状态
+     */
     constructor() {
-        this.board = Array(9).fill(null);
-        this.currentPlayer = 'X';
-        this.gameOver = false;
+        this.board = Array(9).fill(null); // 3x3棋盘（用数组表示）
+        this.currentPlayer = 'X';         // 当前玩家（X先）
+        this.gameOver = false;            // 游戏是否结束
         this.init();
     }
 
+    /**
+     * 初始化方法：渲染棋盘并设置事件监听器
+     */
     init() {
         this.renderBoard();
         document.getElementById('tttReset').addEventListener('click', () => this.resetGame());
     }
 
+    /**
+     * 渲染棋盘到DOM
+     */
     renderBoard() {
         const boardEl = document.getElementById('tttBoard');
         boardEl.innerHTML = '';
+        
         for (let i = 0; i < 9; i++) {
             const cell = document.createElement('div');
             cell.className = 'ttt-cell';
+            
+            // 如果该位置有棋子，显示并添加对应样式
             if (this.board[i]) {
                 cell.classList.add(this.board[i].toLowerCase());
                 cell.textContent = this.board[i];
             }
+            
             cell.addEventListener('click', () => this.makeMove(i));
             boardEl.appendChild(cell);
         }
     }
 
+    /**
+     * 玩家落子
+     * @param {number} index - 落子位置（0-8）
+     */
     makeMove(index) {
+        // 如果位置已被占用或游戏已结束，不处理
         if (this.board[index] || this.gameOver) return;
+        
+        // 落子
         this.board[index] = this.currentPlayer;
         this.renderBoard();
+        
+        // 检查是否获胜
         if (this.checkWin()) {
             alert(`玩家 ${this.currentPlayer} 获胜！`);
             this.gameOver = true;
             return;
         }
+        
+        // 检查是否平局
         if (this.board.every(cell => cell)) {
             alert('平局！');
             this.gameOver = true;
             return;
         }
+        
+        // 切换玩家
         this.currentPlayer = this.currentPlayer === 'X' ? 'O' : 'X';
         document.getElementById('tttPlayer').textContent = this.currentPlayer;
     }
 
+    /**
+     * 检查是否有玩家获胜
+     * @returns {boolean} - 是否获胜
+     */
     checkWin() {
+        // 所有可能的获胜组合（3行、3列、2条对角线）
         const lines = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],
-            [0, 4, 8], [2, 4, 6]
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],  // 行
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],  // 列
+            [0, 4, 8], [2, 4, 6]              // 对角线
         ];
+        
         for (let line of lines) {
             if (this.board[line[0]] &&
                 this.board[line[0]] === this.board[line[1]] &&
@@ -998,6 +1331,9 @@ class TicTacToeGame {
         return false;
     }
 
+    /**
+     * 重置游戏
+     */
     resetGame() {
         this.board = Array(9).fill(null);
         this.currentPlayer = 'X';
