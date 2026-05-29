@@ -1343,65 +1343,100 @@ class TicTacToeGame {
     }
 }
 
+/**
+ * 记忆翻牌游戏类
+ * 玩家需要找出所有配对的卡片
+ */
 class MemoryGame {
+    /**
+     * 构造函数：初始化游戏状态
+     */
     constructor() {
-        this.cards = [];
-        this.flipped = [];
-        this.matched = [];
-        this.moves = 0;
-        this.symbols = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒', '🍑', '🍍'];
+        this.cards = [];       // 卡片数组（包含配对的符号）
+        this.flipped = [];     // 当前翻开的卡片索引
+        this.matched = [];     // 已配对的卡片索引
+        this.moves = 0;        // 移动次数
+        this.symbols = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒', '🍑', '🍍']; // 卡片符号
         this.init();
     }
 
+    /**
+     * 初始化方法：洗牌并渲染卡片
+     */
     init() {
         this.shuffleCards();
         this.renderCards();
         document.getElementById('memoryReset').addEventListener('click', () => this.resetGame());
     }
 
+    /**
+     * 洗牌（Fisher-Yates算法）
+     */
     shuffleCards() {
+        // 创建配对的卡片数组（每个符号出现两次）
         this.cards = [...this.symbols, ...this.symbols];
+        
+        // Fisher-Yates洗牌算法
         for (let i = this.cards.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [this.cards[i], this.cards[j]] = [this.cards[j], this.cards[i]];
         }
+        
         this.flipped = [];
         this.matched = [];
         this.moves = 0;
         document.getElementById('memoryMoves').textContent = this.moves;
     }
 
+    /**
+     * 渲染卡片到DOM
+     */
     renderCards() {
         const grid = document.getElementById('memoryGrid');
         grid.innerHTML = '';
+        
         for (let i = 0; i < this.cards.length; i++) {
             const card = document.createElement('div');
             card.className = 'memory-card';
             card.dataset.index = i;
-            card.textContent = '?';
+            card.textContent = '?'; // 默认显示问号
             card.addEventListener('click', () => this.flipCard(i));
             grid.appendChild(card);
         }
     }
 
+    /**
+     * 翻转卡片
+     * @param {number} index - 要翻转的卡片索引
+     */
     flipCard(index) {
+        // 防止重复翻转：已有两张翻开、已翻开、已配对
         if (this.flipped.length >= 2 || this.flipped.includes(index) || this.matched.includes(index)) return;
+        
         const cards = document.querySelectorAll('.memory-card');
         cards[index].classList.add('flipped');
         cards[index].textContent = this.cards[index];
         this.flipped.push(index);
+        
+        // 如果翻开了两张卡片
         if (this.flipped.length === 2) {
             this.moves++;
             document.getElementById('memoryMoves').textContent = this.moves;
+            
+            // 检查是否匹配
             if (this.cards[this.flipped[0]] === this.cards[this.flipped[1]]) {
+                // 匹配成功
                 this.matched.push(...this.flipped);
                 cards[this.flipped[0]].classList.add('matched');
                 cards[this.flipped[1]].classList.add('matched');
                 this.flipped = [];
+                
+                // 检查是否全部配对完成
                 if (this.matched.length === this.cards.length) {
                     setTimeout(() => alert(`恭喜！你用了 ${this.moves} 步完成！`), 300);
                 }
             } else {
+                // 匹配失败，延迟翻回去
                 setTimeout(() => {
                     cards[this.flipped[0]].classList.remove('flipped');
                     cards[this.flipped[0]].textContent = '?';
@@ -1413,87 +1448,150 @@ class MemoryGame {
         }
     }
 
+    /**
+     * 重置游戏
+     */
     resetGame() {
         this.shuffleCards();
         this.renderCards();
     }
 }
 
+/**
+ * 打地鼠游戏类
+ * 在限定时间内点击出现的地鼠获得分数（30秒内尽可能多地击中地鼠）
+ */
 class WhackAMoleGame {
+    /**
+     * 构造函数：初始化游戏状态
+     */
     constructor() {
-        this.score = 0;
-        this.timeLeft = 30;
-        this.gameRunning = false;
-        this.timer = null;
-        this.moleTimer = null;
+        this.score = 0;         // 当前得分
+        this.timeLeft = 30;     // 剩余时间（秒）
+        this.gameRunning = false; // 游戏是否正在运行
+        this.timer = null;      // 倒计时定时器
+        this.moleTimer = null;  // 地鼠出现定时器
         this.init();
     }
 
+    /**
+     * 初始化方法：渲染游戏网格并设置事件监听器
+     */
     init() {
         this.renderGrid();
         document.getElementById('whackStart').addEventListener('click', () => this.startGame());
     }
 
+    /**
+     * 渲染3x3的游戏网格
+     */
     renderGrid() {
         const grid = document.getElementById('whackGrid');
         grid.innerHTML = '';
+        
+        // 创建9个洞（3x3网格）
         for (let i = 0; i < 9; i++) {
             const hole = document.createElement('div');
             hole.className = 'whack-hole';
+            
             const mole = document.createElement('div');
             mole.className = 'whack-mole';
-            mole.textContent = '🦔';
+            mole.textContent = '🦔'; // 地鼠表情
             mole.addEventListener('click', () => this.whackMole(i));
+            
             hole.appendChild(mole);
             grid.appendChild(hole);
         }
     }
 
+    /**
+     * 开始游戏
+     */
     startGame() {
         if (this.gameRunning) return;
+        
         this.score = 0;
         this.timeLeft = 30;
         this.gameRunning = true;
         document.getElementById('whackScore').textContent = this.score;
         document.getElementById('whackTime').textContent = this.timeLeft;
+        
+        // 启动倒计时（每秒更新）
         this.timer = setInterval(() => {
             this.timeLeft--;
             document.getElementById('whackTime').textContent = this.timeLeft;
             if (this.timeLeft <= 0) this.gameOver();
         }, 1000);
+        
+        // 开始显示地鼠
         this.showMole();
     }
 
+    /**
+     * 随机显示地鼠
+     */
     showMole() {
         if (!this.gameRunning) return;
+        
+        // 隐藏所有地鼠
         const moles = document.querySelectorAll('.whack-mole');
         moles.forEach(m => m.classList.remove('active'));
+        
+        // 随机选择一个洞显示地鼠
         const randomIndex = Math.floor(Math.random() * 9);
         moles[randomIndex].classList.add('active');
+        
+        // 地鼠显示一段时间后消失（600ms-1000ms随机），然后显示下一只
         this.moleTimer = setTimeout(() => this.showMole(), 600 + Math.random() * 400);
     }
 
+    /**
+     * 敲击地鼠
+     * @param {number} index - 被点击的地鼠索引
+     */
     whackMole(index) {
         if (!this.gameRunning) return;
+        
         const moles = document.querySelectorAll('.whack-mole');
+        // 如果地鼠是活跃状态（显示中）
         if (moles[index].classList.contains('active')) {
-            this.score += 10;
+            this.score += 10;  // 击中得10分
             document.getElementById('whackScore').textContent = this.score;
-            moles[index].classList.remove('active');
+            moles[index].classList.remove('active'); // 隐藏地鼠
         }
     }
 
+    /**
+     * 游戏结束处理
+     */
     gameOver() {
         this.gameRunning = false;
         clearInterval(this.timer);
         clearTimeout(this.moleTimer);
+        
+        // 隐藏所有地鼠
         document.querySelectorAll('.whack-mole').forEach(m => m.classList.remove('active'));
+        
         alert(`游戏结束！得分：${this.score}`);
     }
 }
 
+/**
+ * 推箱子游戏类（Sokoban）
+ * 玩家需要使用方向键控制角色将所有箱子推到目标位置
+ * 地图符号说明：
+ * - # : 墙壁
+ * - . : 目标位置
+ * - $ : 箱子
+ * - @ : 玩家
+ * - 空格 : 空地
+ */
 class SokobanGame {
+    /**
+     * 构造函数：初始化游戏状态和关卡数据
+     */
     constructor() {
+        // 关卡数据（3个难度递增的关卡）
         this.levels = [
             [
                 "########",
@@ -1519,13 +1617,17 @@ class SokobanGame {
                 "########"
             ]
         ];
-        this.currentLevel = 0;
-        this.board = [];
-        this.playerPos = {x: 0, y: 0};
+        
+        this.currentLevel = 0;     // 当前关卡索引
+        this.board = [];           // 当前游戏面板状态
+        this.playerPos = {x: 0, y: 0}; // 玩家位置
         this.keyHandler = (e) => this.handleKeyDown(e);
         this.init();
     }
 
+    /**
+     * 初始化方法：加载初始关卡并设置事件监听器
+     */
     init() {
         this.loadLevel(this.currentLevel);
         document.getElementById('sokobanReset').addEventListener('click', () => this.loadLevel(this.currentLevel));
@@ -1534,9 +1636,16 @@ class SokobanGame {
         document.addEventListener('keydown', this.keyHandler);
     }
 
+    /**
+     * 加载指定关卡
+     * @param {number} levelIndex - 关卡索引
+     */
     loadLevel(levelIndex) {
         const level = this.levels[levelIndex];
+        // 将关卡字符串转换为二维数组
         this.board = level.map(row => row.split(''));
+        
+        // 查找玩家初始位置
         for (let y = 0; y < this.board.length; y++) {
             for (let x = 0; x < this.board[y].length; x++) {
                 if (this.board[y][x] === '@') {
@@ -1544,25 +1653,35 @@ class SokobanGame {
                 }
             }
         }
+        
         document.getElementById('sokobanLevel').textContent = levelIndex + 1;
         this.renderBoard();
     }
 
+    /**
+     * 渲染游戏面板到DOM
+     */
     renderBoard() {
         const boardEl = document.getElementById('sokobanBoard');
         boardEl.innerHTML = '';
         boardEl.style.gridTemplateColumns = `repeat(${this.board[0].length}, 40px)`;
+        
         for (let y = 0; y < this.board.length; y++) {
             for (let x = 0; x < this.board[y].length; x++) {
                 const cell = document.createElement('div');
                 cell.className = 'sokoban-cell';
-                const char = this.levels[this.currentLevel][y][x];
-                const currentChar = this.board[y][x];
+                
+                const char = this.levels[this.currentLevel][y][x];    // 原始关卡字符
+                const currentChar = this.board[y][x];                   // 当前状态字符
+                
+                // 根据字符类型设置单元格样式
                 if (char === '#' || currentChar === '#') {
                     cell.classList.add('sokoban-wall');
                 } else {
                     cell.classList.add(char === '.' ? 'sokoban-target' : 'sokoban-floor');
                 }
+                
+                // 添加箱子或玩家元素
                 if (currentChar === '$') {
                     const box = document.createElement('div');
                     box.className = 'sokoban-box';
@@ -1578,11 +1697,16 @@ class SokobanGame {
                     player.style.borderRadius = '50%';
                     cell.appendChild(player);
                 }
+                
                 boardEl.appendChild(cell);
             }
         }
     }
 
+    /**
+     * 处理键盘事件（方向键控制）
+     * @param {KeyboardEvent} e - 键盘事件对象
+     */
     handleKeyDown(e) {
         const dirs = {
             ArrowUp: {x: 0, y: -1},
@@ -1596,36 +1720,64 @@ class SokobanGame {
         }
     }
 
+    /**
+     * 移动玩家
+     * @param {Object} dir - 移动方向 {x, y}
+     */
     move(dir) {
         const newX = this.playerPos.x + dir.x;
         const newY = this.playerPos.y + dir.y;
+        
+        // 边界检查
         if (newY < 0 || newY >= this.board.length || newX < 0 || newX >= this.board[0].length) return;
+        
+        // 墙壁检查
         if (this.board[newY][newX] === '#') return;
+        
         const originalLevel = this.levels[this.currentLevel];
+        
+        // 如果目标位置是箱子
         if (this.board[newY][newX] === '$') {
             const boxNewX = newX + dir.x;
             const boxNewY = newY + dir.y;
+            
+            // 箱子移动的边界检查
             if (boxNewY < 0 || boxNewY >= this.board.length || boxNewX < 0 || boxNewX >= this.board[0].length) return;
+            
+            // 箱子移动的障碍物检查（墙壁或其他箱子）
             if (this.board[boxNewY][boxNewX] === '#' || this.board[boxNewY][boxNewX] === '$') return;
+            
+            // 移动箱子
             this.board[boxNewY][boxNewX] = '$';
             this.board[newY][newX] = originalLevel[newY][newX] === '.' ? '.' : ' ';
         }
+        
+        // 保存玩家原位置的原始字符
         const origChar = originalLevel[this.playerPos.y][this.playerPos.x];
         this.board[this.playerPos.y][this.playerPos.x] = origChar === '.' ? '.' : ' ';
+        
+        // 更新玩家位置
         this.playerPos = {x: newX, y: newY};
         this.board[newY][newX] = '@';
+        
         this.renderBoard();
         this.checkWin();
     }
 
+    /**
+     * 检查是否完成当前关卡（所有箱子都在目标位置上）
+     */
     checkWin() {
         for (let y = 0; y < this.levels[this.currentLevel].length; y++) {
             for (let x = 0; x < this.levels[this.currentLevel][y].length; x++) {
+                // 如果有目标位置没有箱子，则未完成
                 if (this.levels[this.currentLevel][y][x] === '.' && this.board[y][x] !== '$') {
                     return;
                 }
             }
         }
+        
+        // 完成关卡
         setTimeout(() => {
             alert('恭喜！关卡完成！');
             if (this.currentLevel < this.levels.length - 1) {
@@ -1634,6 +1786,9 @@ class SokobanGame {
         }, 100);
     }
 
+    /**
+     * 上一关
+     */
     prevLevel() {
         if (this.currentLevel > 0) {
             this.currentLevel--;
@@ -1641,6 +1796,9 @@ class SokobanGame {
         }
     }
 
+    /**
+     * 下一关
+     */
     nextLevel() {
         if (this.currentLevel < this.levels.length - 1) {
             this.currentLevel++;
@@ -1648,55 +1806,84 @@ class SokobanGame {
         }
     }
 
+    /**
+     * 移除事件监听器
+     */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyHandler);
     }
 }
 
+/**
+ * 猜数字游戏类
+ * 玩家需要在1-100之间猜一个随机生成的数字，系统会提示太大或太小
+ */
 class GuessNumberGame {
+    /**
+     * 构造函数：初始化游戏状态
+     */
     constructor() {
-        this.targetNumber = 0;
-        this.guessCount = 0;
+        this.targetNumber = 0;  // 目标数字
+        this.guessCount = 0;    // 猜测次数
         this.init();
     }
 
+    /**
+     * 初始化方法：开始新游戏并设置事件监听器
+     */
     init() {
         this.startNewGame();
         document.getElementById('guessBtn').addEventListener('click', () => this.makeGuess());
         document.getElementById('guessReset').addEventListener('click', () => this.startNewGame());
+        
+        // 回车键提交猜测
         document.getElementById('guessInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.makeGuess();
         });
     }
 
+    /**
+     * 开始新游戏（生成随机目标数字）
+     */
     startNewGame() {
-        this.targetNumber = Math.floor(Math.random() * 100) + 1;
+        this.targetNumber = Math.floor(Math.random() * 100) + 1; // 生成1-100的随机数
         this.guessCount = 0;
         document.getElementById('guessCount').textContent = this.guessCount;
         document.getElementById('guessResult').textContent = '';
         document.getElementById('guessInput').value = '';
     }
 
+    /**
+     * 处理玩家猜测
+     */
     makeGuess() {
         const input = document.getElementById('guessInput');
         const guess = parseInt(input.value);
+        
+        // 输入验证
         if (isNaN(guess) || guess < 1 || guess > 100) {
             document.getElementById('guessResult').textContent = '请输入1-100之间的数字！';
-            document.getElementById('guessResult').style.color = '#e74c3c';
+            document.getElementById('guessResult').style.color = '#e74c3c'; // 红色提示错误
             return;
         }
+        
+        // 更新猜测次数
         this.guessCount++;
         document.getElementById('guessCount').textContent = this.guessCount;
+        
+        // 判断猜测结果
         if (guess === this.targetNumber) {
             document.getElementById('guessResult').textContent = `恭喜！你猜对了！用了 ${this.guessCount} 次！`;
-            document.getElementById('guessResult').style.color = '#27ae60';
+            document.getElementById('guessResult').style.color = '#27ae60'; // 绿色表示成功
         } else if (guess < this.targetNumber) {
             document.getElementById('guessResult').textContent = '太小了！再大一点！';
-            document.getElementById('guessResult').style.color = '#3498db';
+            document.getElementById('guessResult').style.color = '#3498db'; // 蓝色提示
         } else {
             document.getElementById('guessResult').textContent = '太大了！再小一点！';
-            document.getElementById('guessResult').style.color = '#e74c3c';
+            document.getElementById('guessResult').style.color = '#e74c3c'; // 红色提示
         }
+        
+        // 清空输入框
         input.value = '';
     }
 }
