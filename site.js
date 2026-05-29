@@ -1,15 +1,26 @@
+/**
+ * 游戏站点主类
+ * 负责管理游戏合集页面的整体流程，包括游戏卡片点击、模态框显示、游戏渲染等
+ */
 class GameSite {
+    /**
+     * 构造函数：初始化DOM元素引用
+     */
     constructor() {
-        this.gamesGrid = document.getElementById('gamesGrid');
-        this.gameModal = document.getElementById('gameModal');
-        this.gameContent = document.getElementById('gameContent');
-        this.closeBtn = document.getElementById('closeBtn');
-        this.currentGame = null;
-        this.currentGameInstance = null;
+        this.gamesGrid = document.getElementById('gamesGrid');  // 游戏卡片网格容器
+        this.gameModal = document.getElementById('gameModal');    // 游戏模态框
+        this.gameContent = document.getElementById('gameContent'); // 游戏内容容器
+        this.closeBtn = document.getElementById('closeBtn');       // 关闭按钮
+        this.currentGame = null;         // 当前运行的游戏名称
+        this.currentGameInstance = null; // 当前游戏实例
         this.init();
     }
 
+    /**
+     * 初始化方法：设置事件监听器
+     */
     init() {
+        // 为每个游戏卡片添加点击事件
         this.gamesGrid.querySelectorAll('.game-card').forEach(card => {
             card.addEventListener('click', () => {
                 const gameName = card.dataset.game;
@@ -17,7 +28,10 @@ class GameSite {
             });
         });
 
+        // 关闭按钮点击事件
         this.closeBtn.addEventListener('click', () => this.closeGame());
+        
+        // 点击模态框背景关闭游戏
         this.gameModal.addEventListener('click', (e) => {
             if (e.target === this.gameModal) {
                 this.closeGame();
@@ -25,24 +39,38 @@ class GameSite {
         });
     }
 
+    /**
+     * 打开指定游戏
+     * @param {string} gameName - 游戏名称
+     */
     openGame(gameName) {
-        this.gameModal.classList.add('active');
-        this.currentGame = gameName;
-        this.renderGame(gameName);
-        document.body.style.overflow = 'hidden';
+        this.gameModal.classList.add('active'); // 显示模态框
+        this.currentGame = gameName;           // 记录当前游戏
+        this.renderGame(gameName);             // 渲染游戏
+        document.body.style.overflow = 'hidden'; // 禁止页面滚动
     }
 
+    /**
+     * 关闭当前游戏
+     */
     closeGame() {
-        this.gameModal.classList.remove('active');
-        this.gameContent.innerHTML = '';
+        this.gameModal.classList.remove('active'); // 隐藏模态框
+        this.gameContent.innerHTML = '';           // 清空游戏内容
+        
+        // 如果当前游戏有移除事件监听器的方法，调用它
         if (this.currentGameInstance && typeof this.currentGameInstance.removeEventListeners === 'function') {
             this.currentGameInstance.removeEventListeners();
         }
-        this.currentGame = null;
-        this.currentGameInstance = null;
-        document.body.style.overflow = '';
+        
+        this.currentGame = null;         // 重置当前游戏名称
+        this.currentGameInstance = null; // 重置当前游戏实例
+        document.body.style.overflow = ''; // 恢复页面滚动
     }
 
+    /**
+     * 根据游戏名称渲染对应的游戏
+     * @param {string} gameName - 游戏名称
+     */
     renderGame(gameName) {
         switch(gameName) {
             case '2048':
