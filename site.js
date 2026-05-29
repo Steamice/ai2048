@@ -1888,27 +1888,41 @@ class GuessNumberGame {
     }
 }
 
+/**
+ * 三消游戏类（Match Three）
+ * 玩家点击两个相邻的宝石进行交换，三个或更多相同的宝石连成一线就会消除
+ */
 class MatchThreeGame {
+    /**
+     * 构造函数：初始化游戏状态
+     */
     constructor() {
-        this.board = [];
-        this.gems = ['💎', '💜', '💛', '💚', '🔮', '⭐'];
-        this.score = 0;
-        this.selected = null;
+        this.board = [];                   // 6x6的游戏面板
+        this.gems = ['💎', '💜', '💛', '💚', '🔮', '⭐']; // 宝石类型
+        this.score = 0;                    // 当前得分
+        this.selected = null;              // 当前选中的宝石位置
         this.init();
     }
 
+    /**
+     * 初始化方法：创建面板并设置事件监听器
+     */
     init() {
         this.createBoard();
         this.renderBoard();
         document.getElementById('matchReset').addEventListener('click', () => this.resetGame());
     }
 
+    /**
+     * 创建游戏面板（确保初始面板没有匹配）
+     */
     createBoard() {
         this.board = [];
         for (let y = 0; y < 6; y++) {
             this.board[y] = [];
             for (let x = 0; x < 6; x++) {
                 let gem;
+                // 确保新宝石不会立即形成匹配
                 do {
                     gem = this.gems[Math.floor(Math.random() * this.gems.length)];
                 } while (this.wouldCreateMatch(x, y, gem));
@@ -1917,15 +1931,28 @@ class MatchThreeGame {
         }
     }
 
+    /**
+     * 检查放置宝石后是否会形成匹配
+     * @param {number} x - 列坐标
+     * @param {number} y - 行坐标
+     * @param {string} gem - 宝石类型
+     * @returns {boolean} - 是否会形成匹配
+     */
     wouldCreateMatch(x, y, gem) {
+        // 检查水平方向
         if (x >= 2 && this.board[y][x-1] === gem && this.board[y][x-2] === gem) return true;
+        // 检查垂直方向
         if (y >= 2 && this.board[y-1][x] === gem && this.board[y-2][x] === gem) return true;
         return false;
     }
 
+    /**
+     * 渲染游戏面板到DOM
+     */
     renderBoard() {
         const grid = document.getElementById('matchGrid');
         grid.innerHTML = '';
+        
         for (let y = 0; y < 6; y++) {
             for (let x = 0; x < 6; x++) {
                 const cell = document.createElement('div');
@@ -1939,38 +1966,75 @@ class MatchThreeGame {
         }
     }
 
+    /**
+     * 处理单元格点击（选择或交换宝石）
+     * @param {number} x - 列坐标
+     * @param {number} y - 行坐标
+     */
     selectCell(x, y) {
         const cells = document.querySelectorAll('.match-cell');
+        
         if (this.selected === null) {
+            // 第一次选择：标记选中状态
             this.selected = {x, y};
             cells[y * 6 + x].classList.add('selected');
         } else {
+            // 第二次选择：移除之前的选中状态
             cells[this.selected.y * 6 + this.selected.x].classList.remove('selected');
+            
+            // 如果相邻则交换
             if (this.isAdjacent(this.selected.x, this.selected.y, x, y)) {
                 this.swapGems(this.selected.x, this.selected.y, x, y);
             }
+            
             this.selected = null;
         }
     }
 
+    /**
+     * 检查两个位置是否相邻
+     * @param {number} x1 - 第一个位置的列坐标
+     * @param {number} y1 - 第一个位置的行坐标
+     * @param {number} x2 - 第二个位置的列坐标
+     * @param {number} y2 - 第二个位置的行坐标
+     * @returns {boolean} - 是否相邻
+     */
     isAdjacent(x1, y1, x2, y2) {
         return (Math.abs(x1 - x2) === 1 && y1 === y2) || (Math.abs(y1 - y2) === 1 && x1 === x2);
     }
 
+    /**
+     * 交换两个宝石
+     * @param {number} x1 - 第一个宝石的列坐标
+     * @param {number} y1 - 第一个宝石的行坐标
+     * @param {number} x2 - 第二个宝石的列坐标
+     * @param {number} y2 - 第二个宝石的行坐标
+     */
     swapGems(x1, y1, x2, y2) {
+        // 执行交换
         [this.board[y1][x1], this.board[y2][x2]] = [this.board[y2][x2], this.board[y1][x1]];
+        
         const matches = this.findMatches();
+        
         if (matches.length > 0) {
+            // 有匹配，执行消除
             this.renderBoard();
             setTimeout(() => this.removeMatches(matches), 300);
         } else {
+            // 无匹配，恢复交换
             [this.board[y1][x1], this.board[y2][x2]] = [this.board[y2][x2], this.board[y1][x1]];
             this.renderBoard();
         }
     }
 
+    /**
+     * 查找所有匹配的宝石（三个或更多相同宝石连成一线）
+     * @returns {string[]} - 匹配位置数组（格式："x,y"）
+     */
     findMatches() {
         const matches = new Set();
+        
+        // 检查水平匹配
         for (let y = 0; y < 6; y++) {
             for (let x = 0; x < 4; x++) {
                 if (this.board[y][x] === this.board[y][x+1] && this.board[y][x] === this.board[y][x+2]) {
@@ -1980,6 +2044,8 @@ class MatchThreeGame {
                 }
             }
         }
+        
+        // 检查垂直匹配
         for (let x = 0; x < 6; x++) {
             for (let y = 0; y < 4; y++) {
                 if (this.board[y][x] === this.board[y+1][x] && this.board[y][x] === this.board[y+2][x]) {
@@ -1989,32 +2055,52 @@ class MatchThreeGame {
                 }
             }
         }
+        
         return Array.from(matches);
     }
 
+    /**
+     * 移除匹配的宝石并处理连锁反应
+     * @param {string[]} matches - 匹配位置数组
+     */
     removeMatches(matches) {
+        // 更新得分（每个宝石10分）
         this.score += matches.length * 10;
         document.getElementById('matchScore').textContent = this.score;
+        
+        // 标记匹配的宝石为null
         matches.forEach(pos => {
             const [x, y] = pos.split(',').map(Number);
             this.board[y][x] = null;
         });
+        
+        // 让宝石下落
         this.dropGems();
+        
+        // 填充空位
         this.fillBoard();
+        
         this.renderBoard();
+        
+        // 检查是否有新的匹配（连锁反应）
         const newMatches = this.findMatches();
         if (newMatches.length > 0) {
             setTimeout(() => this.removeMatches(newMatches), 300);
         }
     }
 
+    /**
+     * 让宝石下落填补空位
+     */
     dropGems() {
         for (let x = 0; x < 6; x++) {
             let emptySpaces = 0;
+            // 从底部向上遍历
             for (let y = 5; y >= 0; y--) {
                 if (this.board[y][x] === null) {
                     emptySpaces++;
                 } else if (emptySpaces > 0) {
+                    // 将宝石下移到空位
                     this.board[y + emptySpaces][x] = this.board[y][x];
                     this.board[y][x] = null;
                 }
@@ -2022,6 +2108,9 @@ class MatchThreeGame {
         }
     }
 
+    /**
+     * 填充面板上空位的宝石
+     */
     fillBoard() {
         for (let y = 0; y < 6; y++) {
             for (let x = 0; x < 6; x++) {
@@ -2032,6 +2121,9 @@ class MatchThreeGame {
         }
     }
 
+    /**
+     * 重置游戏
+     */
     resetGame() {
         this.score = 0;
         document.getElementById('matchScore').textContent = this.score;
