@@ -71,6 +71,7 @@ class Game2048 {
     /**
      * 设置触摸屏滑动控制
      * 通过记录触摸起点和终点，判断滑动方向
+     * 该方法在构造函数中调用，初始化触摸屏滑动控制。
      */
     setupTouchControls() {
         let touchStartX = 0;
