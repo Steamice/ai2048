@@ -97,6 +97,10 @@ body {
     background: white;
     min-height: 100vh;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
 }
 
 .close-btn {
@@ -328,6 +332,7 @@ body {
 .game-sokoban-container,
 .game-match-container {
     text-align: center;
+    padding: 20px;
 }
 
 .game-snake-container canvas,
@@ -338,6 +343,13 @@ body {
     background: #1a1a1a;
     display: block;
     margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+}
+
+/* 俄罗斯方块画布在大屏下更显眼 */
+.game-tetris-container canvas {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 .game-controls {

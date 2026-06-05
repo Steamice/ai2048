@@ -151,15 +151,16 @@ class GameSite {
     }
 
     renderTetris() {
+        // 画布尺寸: 10列×40px = 400px宽, 20行×40px = 800px高
         this.gameContent.innerHTML = `
             <div class="game-tetris-container">
                 <h2>🧱 俄罗斯方块</h2>
                 <div class="score-display">得分: <span id="tetrisScore">0</span> | 等级: <span id="tetrisLevel">1</span></div>
-                <canvas id="tetrisCanvas" width="300" height="600"></canvas>
+                <canvas id="tetrisCanvas" width="400" height="800"></canvas>
                 <div class="game-controls">
                     <button class="btn" id="tetrisStart">开始游戏</button>
                 </div>
-                <p style="margin-top: 15px; color: #666;">← → 移动 | ↑ 旋转 | ↓ 加速</p>
+                <p style="margin-top: 15px; color: #666;">← → 移动 | ↑ 旋转 | ↓ 加速 | 空格 硬降落</p>
             </div>
         `;
         this.currentGameInstance = new TetrisGame();
@@ -492,7 +493,7 @@ class TetrisGame {
         this.ctx = this.canvas.getContext('2d');
 
         // ===== 常量定义（便于维护与调整）=====
-        this.GRID_SIZE = 30;           // 每个格子的大小（像素）
+        this.GRID_SIZE = 40;           // 每个格子的大小（像素）
         this.COLS = 10;                // 面板列数
         this.ROWS = 20;                // 面板行数
         this.MAX_DROP_INTERVAL = 800;  // 起始下落间隔（毫秒）
@@ -900,22 +901,36 @@ class TetrisGame {
         const px = x * this.GRID_SIZE;
         const py = y * this.GRID_SIZE;
         const size = this.GRID_SIZE - 2;
-        
+
         // 绘制主方块
         this.ctx.fillStyle = color;
         this.ctx.fillRect(px + 1, py + 1, size, size);
-        
-        // 绘制高光效果
+
+        // 绘制高光效果（左上到右下的对角渐变）
         const gradient = this.ctx.createLinearGradient(px, py, px + size, py + size);
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(px + 1, py + 1, size, size);
-        
-        // 绘制边框
-        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeRect(px + 1, py + 1, size, size);
+
+        // 绘制顶部高光线
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(px + 2, py + size);
+        this.ctx.lineTo(px + 2, py + 2);
+        this.ctx.lineTo(px + size, py + 2);
+        this.ctx.stroke();
+
+        // 绘制右下阴影线
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(px + size, py + 2);
+        this.ctx.lineTo(px + size, py + size);
+        this.ctx.lineTo(px + 2, py + size);
+        this.ctx.stroke();
     }
 
     /**
