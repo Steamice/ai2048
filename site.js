@@ -274,356 +274,21 @@ class GameSite {
 
 /**
  * 2048 游戏类（站点版本）
- * 在游戏合集中运行的2048游戏实现，支持键盘控制
+ * 继承自 window.Game2048Base，复用核心逻辑，仅适配游戏合集中的DOM结构
  */
-class Game2048ForSite {
+class Game2048ForSite extends (window.Game2048Base || Object) {
     /**
-     * 构造函数：初始化游戏状态和DOM元素
+     * 构造函数：使用站点版本专属的DOM ID
      */
     constructor() {
-        this.size = 4;                          // 网格大小（4x4）
-        this.board = [];                        // 游戏棋盘数据
-        this.score = 0;                         // 当前得分
-        this.bestScore = this.loadBestScore();  // 历史最高分（从本地存储加载）
-        
-        // DOM元素引用
-        this.gameBoard = document.getElementById('gameBoard2048');
-        this.scoreElement = document.getElementById('score2048');
-        this.bestScoreElement = document.getElementById('bestScore2048');
-        this.newGameButton = document.getElementById('newGame2048');
-        
-        this.hasWon = false;                    // 是否已达到2048
-        this.tileIdCounter = 0;                 // 方块ID计数器（用于动画追踪）
-        this.tilePositions = {};                // 方块位置映射（ID -> {row, col}）
-        
-        this.keyHandler = (e) => this.handleKeyDown(e); // 键盘事件处理器
-        this.init();                            // 初始化游戏
-    }
-
-    /**
-     * 初始化游戏：设置事件监听器并开始新游戏
-     */
-    init() {
-        this.setupEventListeners();
-        this.startNewGame();
-    }
-
-    /**
-     * 设置事件监听器：新游戏按钮和键盘事件
-     */
-    setupEventListeners() {
-        this.newGameButton.addEventListener('click', () => this.startNewGame());
-        document.addEventListener('keydown', this.keyHandler);
-    }
-
-    /**
-     * 移除事件监听器（用于关闭游戏时清理）
-     */
-    removeEventListeners() {
-        document.removeEventListener('keydown', this.keyHandler);
-    }
-
-    /**
-     * 处理键盘方向键事件
-     * @param {KeyboardEvent} e - 键盘事件对象
-     */
-    handleKeyDown(e) {
-        const keyMap = {
-            ArrowUp: 'up',
-            ArrowDown: 'down',
-            ArrowLeft: 'left',
-            ArrowRight: 'right'
-        };
-        if (keyMap[e.key]) {
-            e.preventDefault();  // 阻止默认行为（如页面滚动）
-            this.move(keyMap[e.key]);
-        }
-    }
-
-    /**
-     * 开始新游戏：重置所有状态并初始化棋盘
-     */
-    startNewGame() {
-        this.board = this.createEmptyBoard();
-        this.score = 0;
-        this.hasWon = false;
-        this.tileIdCounter = 0;
-        this.tilePositions = {};
-        this.addRandomTile();  // 初始生成两个方块
-        this.addRandomTile();
-        this.updateUI();       // 更新界面显示
-    }
-
-    /**
-     * 创建空棋盘（4x4网格）
-     * @returns {Array} - 4x4二维数组，每个单元格存储{value, id, isNew, isMerged}
-     */
-    createEmptyBoard() {
-        const board = [];
-        for (let i = 0; i < this.size; i++) {
-            board[i] = [];
-            for (let j = 0; j < this.size; j++) {
-                board[i][j] = { value: 0, id: null, isNew: false, isMerged: false };
-            }
-        }
-        return board;
-    }
-
-    /**
-     * 在随机空位添加新方块（90%概率为2，10%概率为4）
-     */
-    addRandomTile() {
-        const emptyCells = [];
-        
-        // 收集所有空格子坐标
-        for (let i = 0; i < this.size; i++) {
-            for (let j = 0; j < this.size; j++) {
-                if (this.board[i][j].value === 0) {
-                    emptyCells.push({ row: i, col: j });
-                }
-            }
-        }
-
-        // 如果有空格子，随机选择一个添加新方块
-        if (emptyCells.length > 0) {
-            const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-            this.tileIdCounter++;
-            
-            this.board[randomCell.row][randomCell.col] = {
-                value: Math.random() < 0.9 ? 2 : 4,  // 90%概率生成2，10%概率生成4
-                id: this.tileIdCounter,
-                isNew: true,       // 标记为新方块（用于动画）
-                isMerged: false
-            };
-            
-            // 记录方块位置
-            this.tilePositions[this.tileIdCounter] = { row: randomCell.row, col: randomCell.col };
-        }
-    }
-
-    /**
-     * 处理方块移动逻辑
-     * @param {string} direction - 移动方向：'up', 'down', 'left', 'right'
-     */
-    move(direction) {
-        let moved = false;  // 标记是否有方块移动
-
-        /**
-         * 处理单行/列的移动和合并逻辑
-         * @param {Array} line - 一行或一列的方块数组
-         * @returns {Array} - 处理后的行/列
-         */
-        const processLine = (line) => {
-            // 过滤掉空格子
-            let newLine = line.filter(cell => cell.value !== 0);
-            
-            // 合并相邻相同数字的方块
-            for (let i = 0; i < newLine.length - 1; i++) {
-                if (newLine[i].value === newLine[i + 1].value) {
-                    newLine[i].value *= 2;          // 合并后数值翻倍
-                    this.score += newLine[i].value; // 更新得分
-                    newLine[i].isMerged = true;    // 标记为合并方块（用于动画）
-                    newLine[i + 1].value = 0;      // 被合并的方块置空
-                    newLine[i + 1].id = null;
-                    moved = true;
-                }
-            }
-            
-            // 再次过滤（移除被合并的方块）
-            newLine = newLine.filter(cell => cell.value !== 0);
-            
-            // 填充空格子使长度达到size
-            while (newLine.length < this.size) {
-                newLine.push({ value: 0, id: null, isNew: false, isMerged: false });
-            }
-            return newLine;
-        };
-
-        // 根据方向处理每一行或列
-        if (direction === 'left') {
-            for (let i = 0; i < this.size; i++) {
-                const original = this.board[i].map(cell => cell.value);
-                this.board[i] = processLine([...this.board[i]]);
-                if (JSON.stringify(original) !== JSON.stringify(this.board[i].map(cell => cell.value))) {
-                    moved = true;
-                }
-            }
-        } else if (direction === 'right') {
-            for (let i = 0; i < this.size; i++) {
-                const original = this.board[i].map(cell => cell.value);
-                this.board[i] = processLine([...this.board[i]].reverse()).reverse();
-                if (JSON.stringify(original) !== JSON.stringify(this.board[i].map(cell => cell.value))) {
-                    moved = true;
-                }
-            }
-        } else if (direction === 'up') {
-            for (let j = 0; j < this.size; j++) {
-                const column = [];
-                for (let i = 0; i < this.size; i++) {
-                    column.push(this.board[i][j]);
-                }
-                const original = column.map(cell => cell.value);
-                const newColumn = processLine(column);
-                for (let i = 0; i < this.size; i++) {
-                    this.board[i][j] = newColumn[i];
-                }
-                if (JSON.stringify(original) !== JSON.stringify(newColumn.map(cell => cell.value))) {
-                    moved = true;
-                }
-            }
-        } else if (direction === 'down') {
-            for (let j = 0; j < this.size; j++) {
-                const column = [];
-                for (let i = 0; i < this.size; i++) {
-                    column.push(this.board[i][j]);
-                }
-                const original = column.map(cell => cell.value);
-                const newColumn = processLine([...column].reverse()).reverse();
-                for (let i = 0; i < this.size; i++) {
-                    this.board[i][j] = newColumn[i];
-                }
-                if (JSON.stringify(original) !== JSON.stringify(newColumn.map(cell => cell.value))) {
-                    moved = true;
-                }
-            }
-        }
-
-        // 如果有移动发生
-        if (moved) {
-            this.updateTilePositions();  // 更新方块位置映射
-            this.addRandomTile();        // 添加新方块
-            this.updateUI();             // 更新界面
-            this.checkWin();             // 检查是否获胜
-            this.checkGameOver();        // 检查是否游戏结束
-        }
-    }
-
-    /**
-     * 更新方块位置映射
-     */
-    updateTilePositions() {
-        this.tilePositions = {};
-        for (let i = 0; i < this.size; i++) {
-            for (let j = 0; j < this.size; j++) {
-                if (this.board[i][j].id !== null) {
-                    this.tilePositions[this.board[i][j].id] = { row: i, col: j };
-                }
-            }
-        }
-    }
-
-    /**
-     * 更新游戏界面显示
-     */
-    updateUI() {
-        this.gameBoard.innerHTML = '';
-        
-        // 创建方块容器
-        for (let i = 0; i < this.size * this.size; i++) {
-            const container = document.createElement('div');
-            container.className = 'tile-container';
-            this.gameBoard.appendChild(container);
-        }
-
-        // 渲染方块
-        for (let i = 0; i < this.size; i++) {
-            for (let j = 0; j < this.size; j++) {
-                const cell = this.board[i][j];
-                if (cell.id !== null) {
-                    const tile = document.createElement('div');
-                    tile.className = `tile tile-${cell.value}`;
-                    
-                    // 添加新方块动画类
-                    if (cell.isNew) {
-                        tile.classList.add('tile-new');
-                        cell.isNew = false;
-                    }
-                    // 添加合并动画类
-                    if (cell.isMerged) {
-                        tile.classList.add('tile-merged');
-                        cell.isMerged = false;
-                    }
-                    
-                    tile.textContent = cell.value;
-                    tile.dataset.tileId = cell.id;
-                    
-                    // 计算方块位置和大小
-                    const boardWidth = this.gameBoard.clientWidth || 400;
-                    const padding = 12;
-                    const gap = 12;
-                    const cellWidth = (boardWidth - 2 * padding - 3 * gap) / 4;
-                    tile.style.width = `${cellWidth}px`;
-                    tile.style.left = `${j * (cellWidth + gap) + padding}px`;
-                    tile.style.top = `${i * (cellWidth + gap) + padding}px`;
-                    
-                    this.gameBoard.appendChild(tile);
-                }
-            }
-        }
-
-        // 更新得分显示
-        this.scoreElement.textContent = this.score;
-        if (this.score > this.bestScore) {
-            this.bestScore = this.score;
-            this.saveBestScore(this.bestScore);
-        }
-        this.bestScoreElement.textContent = this.bestScore;
-    }
-
-    /**
-     * 检查是否达到2048（获胜条件）
-     */
-    checkWin() {
-        if (!this.hasWon) {
-            for (let i = 0; i < this.size; i++) {
-                for (let j = 0; j < this.size; j++) {
-                    if (this.board[i][j].value === 2048) {
-                        this.hasWon = true;
-                        if (confirm('恭喜！你达到了2048！继续游戏吗？')) {
-                            return;
-                        } else {
-                            this.startNewGame();
-                        }
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * 检查是否游戏结束（无法继续移动）
-     */
-    checkGameOver() {
-        for (let i = 0; i < this.size; i++) {
-            for (let j = 0; j < this.size; j++) {
-                // 如果有空格子，游戏未结束
-                if (this.board[i][j].value === 0) return;
-                // 如果右边有相同数字，游戏未结束
-                if (j < this.size - 1 && this.board[i][j].value === this.board[i][j + 1].value) return;
-                // 如果下边有相同数字，游戏未结束
-                if (i < this.size - 1 && this.board[i][j].value === this.board[i + 1][j].value) return;
-            }
-        }
-        alert(`游戏结束！你的得分：${this.score}`);
-        this.startNewGame();
-    }
-
-    /**
-     * 从本地存储加载最高分
-     * @returns {number} - 最高分
-     */
-    loadBestScore() {
-        const saved = localStorage.getItem('2048-best-score');
-        return saved ? parseInt(saved, 10) : 0;
-    }
-
-    /**
-     * 保存最高分到本地存储
-     * @param {number} score - 要保存的分数
-     */
-    saveBestScore(score) {
-        localStorage.setItem('2048-best-score', score.toString());
+        super({
+            boardId: 'gameBoard2048',
+            scoreId: 'score2048',
+            bestScoreId: 'bestScore2048',
+            newGameBtnId: 'newGame2048'
+        });
+        // 模态框内的游戏不需要触摸控制
+        this.enableTouch = false;
     }
 }
 
@@ -638,7 +303,16 @@ class SnakeGame {
     constructor() {
         this.canvas = document.getElementById('snakeCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.gridSize = 20;        // 每个格子的大小（像素）
+
+        // ===== 常量定义（便于维护与调整）=====
+        this.GRID_SIZE = 20;       // 每个格子的大小（像素）
+        this.GRID_COUNT = 20;      // 网格行列数（20x20）
+        this.UPDATE_INTERVAL = 100; // 游戏更新间隔（毫秒）
+        this.SCORE_PER_FOOD = 10;  // 每吃到一个食物得分
+        this.SNAKE_COLOR = '#27ae60'; // 蛇身颜色
+        this.FOOD_COLOR = '#e74c3c';  // 食物颜色
+        this.BG_COLOR = '#1a1a1a';    // 画布背景色
+
         this.score = 0;            // 当前得分
         this.snake = [{x: 10, y: 10}]; // 蛇的身体（由多个段组成）
         this.direction = {x: 1, y: 0}; // 移动方向（初始向右）
@@ -665,23 +339,21 @@ class SnakeGame {
      */
     handleKeyDown(e) {
         if (!this.gameRunning) return;
-        const keyMap = {
-            ArrowUp: {x: 0, y: -1},
-            ArrowDown: {x: 0, y: 1},
-            ArrowLeft: {x: -1, y: 0},
+        const KEY_DIRECTIONS = {
+            ArrowUp:    {x: 0, y: -1},
+            ArrowDown:  {x: 0, y: 1},
+            ArrowLeft:  {x: -1, y: 0},
             ArrowRight: {x: 1, y: 0}
         };
-        if (keyMap[e.key]) {
-            e.preventDefault();
-            const newDir = keyMap[e.key];
-            // 如果蛇长度大于1，防止反向移动
-            if (this.snake.length > 1) {
-                if (newDir.x !== -this.direction.x || newDir.y !== -this.direction.y) {
-                    this.direction = newDir;
-                }
-            } else {
-                this.direction = newDir;
-            }
+        const newDir = KEY_DIRECTIONS[e.key];
+        if (!newDir) return;
+        e.preventDefault();
+        // 如果蛇长度大于1，防止反向移动（避免立即撞到自己）
+        if (this.snake.length > 1) {
+            const isOpposite = newDir.x === -this.direction.x && newDir.y === -this.direction.y;
+            if (!isOpposite) this.direction = newDir;
+        } else {
+            this.direction = newDir;
         }
     }
 
@@ -696,21 +368,27 @@ class SnakeGame {
         this.food = this.generateFood();
         this.gameRunning = true;
         document.getElementById('snakeScore').textContent = this.score;
-        this.gameLoop = setInterval(() => this.update(), 100); // 每100ms更新一次
+        this.gameLoop = setInterval(() => this.update(), this.UPDATE_INTERVAL);
     }
 
     /**
      * 在随机位置生成食物（确保不在蛇身上）
-     * @returns {Object} - 食物位置{x, y}
+     * @returns {{x:number,y:number}} 食物位置
      */
     generateFood() {
         let food;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 1000; // 防止极端情况下（蛇占满棋盘）死循环
         do {
             food = {
-                x: Math.floor(Math.random() * 20),
-                y: Math.floor(Math.random() * 20)
+                x: Math.floor(Math.random() * this.GRID_COUNT),
+                y: Math.floor(Math.random() * this.GRID_COUNT)
             };
-        } while (this.snake.some(segment => segment.x === food.x && segment.y === food.y));
+            attempts++;
+        } while (
+            attempts < MAX_ATTEMPTS
+            && this.snake.some(segment => segment.x === food.x && segment.y === food.y)
+        );
         return food;
     }
 
@@ -720,54 +398,65 @@ class SnakeGame {
      */
     update() {
         // 计算新的头部位置
-        const head = {x: this.snake[0].x + this.direction.x, y: this.snake[0].y + this.direction.y};
-        
-        // 检测边界碰撞
-        if (head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) {
+        const head = {
+            x: this.snake[0].x + this.direction.x,
+            y: this.snake[0].y + this.direction.y
+        };
+
+        // 边界碰撞检测
+        if (head.x < 0 || head.x >= this.GRID_COUNT
+            || head.y < 0 || head.y >= this.GRID_COUNT) {
             this.gameOver();
             return;
         }
-        
-        // 检测自身碰撞
-        for (let segment of this.snake) {
-            if (head.x === segment.x && head.y === segment.y) {
-                this.gameOver();
-                return;
-            }
+        // 自身碰撞检测
+        if (this.snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+            this.gameOver();
+            return;
         }
-        
+
         // 添加新头部
         this.snake.unshift(head);
-        
+
         // 检测是否吃到食物
         if (head.x === this.food.x && head.y === this.food.y) {
-            this.score += 10;
+            this.score += this.SCORE_PER_FOOD;
             document.getElementById('snakeScore').textContent = this.score;
-            this.food = this.generateFood(); // 生成新食物
+            this.food = this.generateFood(); // 生成新食物（蛇身增长，尾部不删除）
         } else {
-            this.snake.pop(); // 移除尾部（移动效果）
+            this.snake.pop(); // 未吃到食物则移除尾部（保持长度不变，实现移动效果）
         }
-        
-        this.draw(); // 重新绘制画面
+
+        this.draw();
     }
 
     /**
      * 绘制游戏画面
      */
     draw() {
-        // 清空画布（黑色背景）
-        this.ctx.fillStyle = '#1a1a1a';
+        // 清空画布
+        this.ctx.fillStyle = this.BG_COLOR;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // 绘制蛇（绿色）
-        this.ctx.fillStyle = '#27ae60';
-        for (let segment of this.snake) {
-            this.ctx.fillRect(segment.x * this.gridSize, segment.y * this.gridSize, this.gridSize - 2, this.gridSize - 2);
+
+        // 绘制蛇身
+        this.ctx.fillStyle = this.SNAKE_COLOR;
+        for (const segment of this.snake) {
+            this.ctx.fillRect(
+                segment.x * this.GRID_SIZE,
+                segment.y * this.GRID_SIZE,
+                this.GRID_SIZE - 2,
+                this.GRID_SIZE - 2
+            );
         }
-        
-        // 绘制食物（红色）
-        this.ctx.fillStyle = '#e74c3c';
-        this.ctx.fillRect(this.food.x * this.gridSize, this.food.y * this.gridSize, this.gridSize - 2, this.gridSize - 2);
+
+        // 绘制食物
+        this.ctx.fillStyle = this.FOOD_COLOR;
+        this.ctx.fillRect(
+            this.food.x * this.GRID_SIZE,
+            this.food.y * this.GRID_SIZE,
+            this.GRID_SIZE - 2,
+            this.GRID_SIZE - 2
+        );
     }
 
     /**
@@ -800,30 +489,37 @@ class TetrisGame {
     constructor() {
         this.canvas = document.getElementById('tetrisCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.gridSize = 30;   // 每个格子的大小（像素）
-        this.cols = 10;       // 列数
-        this.rows = 20;       // 行数
+
+        // ===== 常量定义（便于维护与调整）=====
+        this.GRID_SIZE = 30;    // 每个格子的大小（像素）
+        this.COLS = 10;         // 面板列数
+        this.ROWS = 20;         // 面板行数
+        this.MAX_DROP_INTERVAL = 500;  // 起始下落间隔（毫秒）
+        this.MIN_DROP_INTERVAL = 100;  // 最快下落间隔（毫秒）
+        this.SPEED_STEP = 50;          // 每升一级减少的间隔（毫秒）
+        this.SCORE_PER_LINE = 100;     // 每消除一行基础得分
+        this.SCORE_PER_LEVEL = 500;    // 升级所需累计分数
+        this.BG_COLOR = '#1a1a1a';     // 画布背景色
+
         this.board = [];      // 游戏面板
         this.score = 0;       // 当前得分
         this.level = 1;       // 当前等级
-        
+
         // 七种标准俄罗斯方块形状（I、O、T、L、J、Z、S）
-        this.pieces = [
-            [[1,1,1,1]],                        // I形
-            [[1,1],[1,1]],                      // O形
-            [[1,1,1],[0,1,0]],                  // T形
-            [[1,1,1],[1,0,0]],                  // L形
-            [[1,1,1],[0,0,1]],                  // J形
-            [[1,1,0],[0,1,1]],                  // Z形
-            [[0,1,1],[1,1,0]]                   // S形
+        // 颜色顺序与形状顺序一一对应
+        this.PIECES = [
+            { shape: [[1,1,1,1]],                 color: '#00f0f0' }, // I形
+            { shape: [[1,1],[1,1]],               color: '#f0f000' }, // O形
+            { shape: [[1,1,1],[0,1,0]],           color: '#a000f0' }, // T形
+            { shape: [[1,1,1],[1,0,0]],           color: '#f0a000' }, // L形
+            { shape: [[1,1,1],[0,0,1]],           color: '#0000f0' }, // J形
+            { shape: [[1,1,0],[0,1,1]],           color: '#f00000' }, // Z形
+            { shape: [[0,1,1],[1,1,0]],           color: '#00f000' }  // S形
         ];
-        
-        // 对应七种方块的颜色
-        this.colors = ['#00f0f0', '#f0f000', '#a000f0', '#f0a000', '#0000f0', '#00f000', '#f00000'];
-        
-        this.currentPiece = null;    // 当前方块
-        this.currentPos = {x: 0, y: 0}; // 当前方块位置
+
+        this.currentPiece = null;    // 当前方块形状矩阵
         this.currentColor = '';      // 当前方块颜色
+        this.currentPos = {x: 0, y: 0}; // 当前方块位置（左上角）
         this.gameRunning = false;    // 游戏是否正在运行
         this.gameLoop = null;        // 游戏循环定时器
         this.keyHandler = (e) => this.handleKeyDown(e);
@@ -845,47 +541,66 @@ class TetrisGame {
      */
     handleKeyDown(e) {
         if (!this.gameRunning) return;
-        if (e.key === 'ArrowLeft') {
+        const actionMap = {
+            ArrowLeft:  () => this.movePiece(-1, 0),  // 左移
+            ArrowRight: () => this.movePiece(1, 0),   // 右移
+            ArrowDown:  () => this.movePiece(0, 1),   // 下移
+            ArrowUp:    () => this.rotatePiece()      // 旋转
+        };
+        const action = actionMap[e.key];
+        if (action) {
             e.preventDefault();
-            this.movePiece(-1, 0);  // 左移
-        } else if (e.key === 'ArrowRight') {
-            e.preventDefault();
-            this.movePiece(1, 0);   // 右移
-        } else if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            this.movePiece(0, 1);   // 下移
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            this.rotatePiece();     // 旋转
+            action();
         }
+    }
+
+    /**
+     * 根据当前等级计算方块自动下落间隔（毫秒）
+     * 等级越高下落越快，但不低于 MIN_DROP_INTERVAL
+     * @returns {number} 下落间隔（毫秒）
+     */
+    getDropInterval() {
+        return Math.max(this.MIN_DROP_INTERVAL, this.MAX_DROP_INTERVAL - (this.level - 1) * this.SPEED_STEP);
+    }
+
+    /**
+     * 启动（或重启）下落定时器
+     */
+    startDropTimer() {
+        clearInterval(this.gameLoop);
+        this.gameLoop = setInterval(() => this.update(), this.getDropInterval());
     }
 
     /**
      * 开始新游戏
      */
     startGame() {
-        // 初始化空白面板
-        this.board = Array(this.rows).fill(null).map(() => Array(this.cols).fill(null));
+        // 初始化空白面板（二维数组）
+        this.board = Array.from({ length: this.ROWS }, () => Array(this.COLS).fill(null));
         this.score = 0;
         this.level = 1;
         this.gameRunning = true;
         document.getElementById('tetrisScore').textContent = this.score;
         document.getElementById('tetrisLevel').textContent = this.level;
         this.spawnPiece();
-        // 等级越高，下落速度越快（最低100ms）
-        this.gameLoop = setInterval(() => this.update(), Math.max(100, 500 - (this.level - 1) * 50));
+        this.startDropTimer();
     }
 
     /**
      * 在顶部生成新方块
      */
     spawnPiece() {
-        const index = Math.floor(Math.random() * this.pieces.length);
-        this.currentPiece = this.pieces[index].map(row => [...row]);
-        this.currentColor = this.colors[index];
-        // 将方块放置在顶部中央
-        this.currentPos = {x: Math.floor(this.cols / 2) - Math.floor(this.currentPiece[0].length / 2), y: 0};
-        
+        const index = Math.floor(Math.random() * this.PIECES.length);
+        const piece = this.PIECES[index];
+        // 深拷贝形状矩阵，避免修改原始模板
+        this.currentPiece = piece.shape.map(row => [...row]);
+        this.currentColor = piece.color;
+        // 水平居中放置
+        this.currentPos = {
+            x: Math.floor(this.COLS / 2) - Math.floor(this.currentPiece[0].length / 2),
+            y: 0
+        };
+
         // 如果刚生成就碰撞，游戏结束
         if (this.checkCollision()) {
             this.gameOver();
@@ -945,7 +660,7 @@ class TetrisGame {
                     const newX = this.currentPos.x + x;
                     const newY = this.currentPos.y + y;
                     // 检测边界碰撞
-                    if (newX < 0 || newX >= this.cols || newY >= this.rows) return true;
+                    if (newX < 0 || newX >= this.COLS || newY >= this.ROWS) return true;
                     // 检测与已固定方块碰撞
                     if (newY >= 0 && this.board[newY][newX]) return true;
                 }
@@ -975,24 +690,23 @@ class TetrisGame {
     clearLines() {
         let linesCleared = 0;
         // 从底部向上检查每一行
-        for (let y = this.rows - 1; y >= 0; y--) {
+        for (let y = this.ROWS - 1; y >= 0; y--) {
             if (this.board[y].every(cell => cell !== null)) {
                 this.board.splice(y, 1);           // 删除该行
-                this.board.unshift(Array(this.cols).fill(null)); // 在顶部添加空行
+                this.board.unshift(Array(this.COLS).fill(null)); // 在顶部添加空行
                 linesCleared++;
                 y++; // 重新检查当前行（因为上面的行已经下移）
             }
         }
-        
+
         if (linesCleared > 0) {
-            // 得分 = 消除行数 × 100 × 消除行数（连消加分）
-            this.score += linesCleared * 100 * linesCleared;
-            this.level = Math.floor(this.score / 500) + 1;
+            // 得分 = 消除行数 × 基础分 × 消除行数（连消加分）
+            this.score += linesCleared * this.SCORE_PER_LINE * linesCleared;
+            this.level = Math.floor(this.score / this.SCORE_PER_LEVEL) + 1;
             document.getElementById('tetrisScore').textContent = this.score;
             document.getElementById('tetrisLevel').textContent = this.level;
-            // 更新游戏速度
-            clearInterval(this.gameLoop);
-            this.gameLoop = setInterval(() => this.update(), Math.max(100, 500 - (this.level - 1) * 50));
+            // 更新游戏速度（应用新等级的下落间隔）
+            this.startDropTimer();
         }
     }
 
@@ -1007,27 +721,32 @@ class TetrisGame {
      * 绘制游戏画面
      */
     draw() {
-        // 清空画布（黑色背景）
-        this.ctx.fillStyle = '#1a1a1a';
+        // 清空画布（深色背景）
+        this.ctx.fillStyle = this.BG_COLOR;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
+
         // 绘制已固定的方块
-        for (let y = 0; y < this.rows; y++) {
-            for (let x = 0; x < this.cols; x++) {
+        for (let y = 0; y < this.ROWS; y++) {
+            for (let x = 0; x < this.COLS; x++) {
                 if (this.board[y][x]) {
                     this.ctx.fillStyle = this.board[y][x];
-                    this.ctx.fillRect(x * this.gridSize, y * this.gridSize, this.gridSize - 1, this.gridSize - 1);
+                    this.ctx.fillRect(x * this.GRID_SIZE, y * this.GRID_SIZE, this.GRID_SIZE - 1, this.GRID_SIZE - 1);
                 }
             }
         }
-        
-        // 绘制当前方块
+
+        // 绘制当前活动方块
         if (this.currentPiece) {
             this.ctx.fillStyle = this.currentColor;
             for (let y = 0; y < this.currentPiece.length; y++) {
                 for (let x = 0; x < this.currentPiece[y].length; x++) {
                     if (this.currentPiece[y][x]) {
-                        this.ctx.fillRect((this.currentPos.x + x) * this.gridSize, (this.currentPos.y + y) * this.gridSize, this.gridSize - 1, this.gridSize - 1);
+                        this.ctx.fillRect(
+                            (this.currentPos.x + x) * this.GRID_SIZE,
+                            (this.currentPos.y + y) * this.GRID_SIZE,
+                            this.GRID_SIZE - 1,
+                            this.GRID_SIZE - 1
+                        );
                     }
                 }
             }
@@ -1062,18 +781,51 @@ class BreakoutGame {
     constructor() {
         this.canvas = document.getElementById('breakoutCanvas');
         this.ctx = this.canvas.getContext('2d');
-        
+
+        // ===== 常量定义（便于维护与调整）=====
+        this.BG_COLOR = '#1a1a1a';      // 画布背景色
+        this.PADDLE_COLOR = '#3498db';  // 挡板颜色
+        this.BALL_COLOR = '#e74c3c';    // 小球颜色
+        this.PADDLE_Y = 470;            // 挡板Y坐标
+        this.PADDLE_WIDTH = 60;         // 挡板宽度
+        this.PADDLE_HEIGHT = 10;        // 挡板高度
+        this.PADDLE_SPEED = 5;          // 挡板移动速度（像素/帧）
+        this.BALL_RADIUS = 8;           // 小球半径
+        this.BALL_SPEED_X = 3;          // 小球初始水平速度
+        this.BALL_SPEED_Y = -3;         // 小球初始垂直速度（向上）
+        this.BRICK_ROWS = 5;            // 砖块行数
+        this.BRICK_COLS = 8;            // 砖块列数
+        this.BRICK_WIDTH = 45;          // 单个砖块宽度
+        this.BRICK_HEIGHT = 20;         // 单个砖块高度
+        this.BRICK_GAP_X = 5;           // 砖块水平间距
+        this.BRICK_GAP_Y = 5;           // 砖块垂直间距
+        this.BRICK_OFFSET_Y = 30;       // 砖块区域顶部偏移
+        this.BRICK_SCORE = 10;          // 击碎砖块得分
+        this.BRICK_COLORS = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db']; // 各行砖块颜色
+
         // 挡板属性
-        this.paddle = {x: 175, y: 470, width: 60, height: 10, speed: 5};
-        
+        this.paddle = {
+            x: 175,
+            y: this.PADDLE_Y,
+            width: this.PADDLE_WIDTH,
+            height: this.PADDLE_HEIGHT,
+            speed: this.PADDLE_SPEED
+        };
+
         // 小球属性
-        this.ball = {x: 200, y: 450, dx: 3, dy: -3, radius: 8};
-        
+        this.ball = {
+            x: 200,
+            y: 450,
+            dx: this.BALL_SPEED_X,
+            dy: this.BALL_SPEED_Y,
+            radius: this.BALL_RADIUS
+        };
+
         this.bricks = [];      // 砖块数组
         this.score = 0;        // 当前得分
         this.gameRunning = false; // 游戏是否正在运行
         this.keys = {};        // 键盘状态追踪
-        
+
         this.keyDownHandler = (e) => { this.keys[e.key] = true; };
         this.keyUpHandler = (e) => { this.keys[e.key] = false; };
         this.init();
@@ -1092,20 +844,26 @@ class BreakoutGame {
      * 开始新游戏
      */
     startGame() {
-        // 创建砖块（5行8列）
+        // 创建砖块网格
         this.bricks = [];
-        for (let row = 0; row < 5; row++) {
-            for (let col = 0; col < 8; col++) {
-                this.bricks.push({x: col * 50 + 5, y: row * 25 + 30, width: 45, height: 20, alive: true});
+        for (let row = 0; row < this.BRICK_ROWS; row++) {
+            for (let col = 0; col < this.BRICK_COLS; col++) {
+                this.bricks.push({
+                    x: col * (this.BRICK_WIDTH + this.BRICK_GAP_X) + this.BRICK_GAP_X,
+                    y: row * (this.BRICK_HEIGHT + this.BRICK_GAP_Y) + this.BRICK_OFFSET_Y,
+                    width: this.BRICK_WIDTH,
+                    height: this.BRICK_HEIGHT,
+                    alive: true
+                });
             }
         }
-        
+
         // 重置挡板和小球位置
         this.paddle.x = 175;
         this.ball.x = 200;
         this.ball.y = 450;
-        this.ball.dx = 3;
-        this.ball.dy = -3;
+        this.ball.dx = this.BALL_SPEED_X;
+        this.ball.dy = this.BALL_SPEED_Y;
         this.score = 0;
         this.gameRunning = true;
         document.getElementById('breakoutScore').textContent = this.score;
@@ -1117,7 +875,7 @@ class BreakoutGame {
      */
     gameLoop() {
         if (!this.gameRunning) return;
-        
+
         // 移动挡板
         if (this.keys['ArrowLeft'] && this.paddle.x > 0) {
             this.paddle.x -= this.paddle.speed;
@@ -1125,38 +883,36 @@ class BreakoutGame {
         if (this.keys['ArrowRight'] && this.paddle.x < this.canvas.width - this.paddle.width) {
             this.paddle.x += this.paddle.speed;
         }
-        
+
         // 移动小球
         this.ball.x += this.ball.dx;
         this.ball.y += this.ball.dy;
-        
-        // 检测边界碰撞（左右）
+
+        // 边界碰撞（左右墙）
         if (this.ball.x <= 0 || this.ball.x >= this.canvas.width) {
             this.ball.dx = -this.ball.dx;
         }
-        
-        // 检测边界碰撞（顶部）
+        // 顶部边界碰撞
         if (this.ball.y <= 0) {
             this.ball.dy = -this.ball.dy;
         }
-        
-        // 检测边界碰撞（底部 - 游戏结束）
+        // 底部边界 - 掉出屏幕则游戏结束
         if (this.ball.y >= this.canvas.height) {
             this.gameOver();
             return;
         }
-        
-        // 检测挡板碰撞
+
+        // 挡板碰撞
         if (this.ball.y + this.ball.radius >= this.paddle.y &&
             this.ball.x >= this.paddle.x &&
             this.ball.x <= this.paddle.x + this.paddle.width) {
             this.ball.dy = -Math.abs(this.ball.dy);
-            // 根据击中挡板的位置调整水平速度
+            // 根据击中挡板的位置调整水平速度，实现角度变化
             this.ball.dx += (this.ball.x - (this.paddle.x + this.paddle.width / 2)) / 20;
         }
-        
-        // 检测砖块碰撞
-        for (let brick of this.bricks) {
+
+        // 砖块碰撞检测
+        for (const brick of this.bricks) {
             if (brick.alive &&
                 this.ball.x >= brick.x &&
                 this.ball.x <= brick.x + brick.width &&
@@ -1164,17 +920,17 @@ class BreakoutGame {
                 this.ball.y <= brick.y + brick.height) {
                 this.ball.dy = -this.ball.dy;
                 brick.alive = false;
-                this.score += 10;
+                this.score += this.BRICK_SCORE;
                 document.getElementById('breakoutScore').textContent = this.score;
             }
         }
-        
-        // 检测是否全部清除（胜利条件）
+
+        // 全部清除则胜利
         if (this.bricks.every(b => !b.alive)) {
             this.gameWin();
             return;
         }
-        
+
         this.draw();
         requestAnimationFrame(() => this.gameLoop());
     }
@@ -1183,26 +939,25 @@ class BreakoutGame {
      * 绘制游戏画面
      */
     draw() {
-        // 清空画布（黑色背景）
-        this.ctx.fillStyle = '#1a1a1a';
+        // 清空画布
+        this.ctx.fillStyle = this.BG_COLOR;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // 绘制挡板（蓝色）
-        this.ctx.fillStyle = '#3498db';
+
+        // 绘制挡板
+        this.ctx.fillStyle = this.PADDLE_COLOR;
         this.ctx.fillRect(this.paddle.x, this.paddle.y, this.paddle.width, this.paddle.height);
-        
-        // 绘制小球（红色）
-        this.ctx.fillStyle = '#e74c3c';
+
+        // 绘制小球
+        this.ctx.fillStyle = this.BALL_COLOR;
         this.ctx.beginPath();
         this.ctx.arc(this.ball.x, this.ball.y, this.ball.radius, 0, Math.PI * 2);
         this.ctx.fill();
-        
+
         // 绘制砖块（每行不同颜色）
-        const colors = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#3498db'];
         for (let i = 0; i < this.bricks.length; i++) {
             const brick = this.bricks[i];
             if (brick.alive) {
-                this.ctx.fillStyle = colors[Math.floor(i / 8) % colors.length];
+                this.ctx.fillStyle = this.BRICK_COLORS[Math.floor(i / this.BRICK_COLS) % this.BRICK_COLORS.length];
                 this.ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
             }
         }
@@ -1768,15 +1523,16 @@ class SokobanGame {
      * 检查是否完成当前关卡（所有箱子都在目标位置上）
      */
     checkWin() {
-        for (let y = 0; y < this.levels[this.currentLevel].length; y++) {
-            for (let x = 0; x < this.levels[this.currentLevel][y].length; x++) {
+        const level = this.levels[this.currentLevel];
+        for (let y = 0; y < level.length; y++) {
+            for (let x = 0; x < level[y].length; x++) {
                 // 如果有目标位置没有箱子，则未完成
-                if (this.levels[this.currentLevel][y][x] === '.' && this.board[y][x] !== '$') {
+                if (level[y][x] === '.' && this.board[y][x] !== '$') {
                     return;
                 }
             }
         }
-        
+
         // 完成关卡
         setTimeout(() => {
             alert('恭喜！关卡完成！');
@@ -1897,10 +1653,16 @@ class MatchThreeGame {
      * 构造函数：初始化游戏状态
      */
     constructor() {
-        this.board = [];                   // 6x6的游戏面板
+        // ===== 常量定义（便于维护与调整）=====
+        this.GRID_SIZE = 6;        // 面板边长（6x6）
+        this.MATCH_MIN = 3;        // 触发消除的最少连击数
+        this.SCORE_PER_GEM = 10;   // 消除一个宝石获得的分数
+        this.SWAP_DELAY = 300;     // 消除动画延迟（毫秒）
+
+        this.board = [];                       // 6x6 的游戏面板
         this.gems = ['💎', '💜', '💛', '💚', '🔮', '⭐']; // 宝石类型
-        this.score = 0;                    // 当前得分
-        this.selected = null;              // 当前选中的宝石位置
+        this.score = 0;                        // 当前得分
+        this.selected = null;                  // 当前选中的宝石位置
         this.init();
     }
 
@@ -1918,9 +1680,9 @@ class MatchThreeGame {
      */
     createBoard() {
         this.board = [];
-        for (let y = 0; y < 6; y++) {
+        for (let y = 0; y < this.GRID_SIZE; y++) {
             this.board[y] = [];
-            for (let x = 0; x < 6; x++) {
+            for (let x = 0; x < this.GRID_SIZE; x++) {
                 let gem;
                 // 确保新宝石不会立即形成匹配
                 do {
@@ -1952,9 +1714,9 @@ class MatchThreeGame {
     renderBoard() {
         const grid = document.getElementById('matchGrid');
         grid.innerHTML = '';
-        
-        for (let y = 0; y < 6; y++) {
-            for (let x = 0; x < 6; x++) {
+
+        for (let y = 0; y < this.GRID_SIZE; y++) {
+            for (let x = 0; x < this.GRID_SIZE; x++) {
                 const cell = document.createElement('div');
                 cell.className = 'match-cell';
                 cell.textContent = this.board[y][x];
@@ -1973,26 +1735,26 @@ class MatchThreeGame {
      */
     selectCell(x, y) {
         const cells = document.querySelectorAll('.match-cell');
-        
+
         if (this.selected === null) {
             // 第一次选择：标记选中状态
             this.selected = {x, y};
-            cells[y * 6 + x].classList.add('selected');
+            cells[y * this.GRID_SIZE + x].classList.add('selected');
         } else {
             // 第二次选择：移除之前的选中状态
-            cells[this.selected.y * 6 + this.selected.x].classList.remove('selected');
-            
+            cells[this.selected.y * this.GRID_SIZE + this.selected.x].classList.remove('selected');
+
             // 如果相邻则交换
             if (this.isAdjacent(this.selected.x, this.selected.y, x, y)) {
                 this.swapGems(this.selected.x, this.selected.y, x, y);
             }
-            
+
             this.selected = null;
         }
     }
 
     /**
-     * 检查两个位置是否相邻
+     * 检查两个位置是否相邻（仅水平或垂直相邻）
      * @param {number} x1 - 第一个位置的列坐标
      * @param {number} y1 - 第一个位置的行坐标
      * @param {number} x2 - 第二个位置的列坐标
@@ -2013,13 +1775,13 @@ class MatchThreeGame {
     swapGems(x1, y1, x2, y2) {
         // 执行交换
         [this.board[y1][x1], this.board[y2][x2]] = [this.board[y2][x2], this.board[y1][x1]];
-        
+
         const matches = this.findMatches();
-        
+
         if (matches.length > 0) {
             // 有匹配，执行消除
             this.renderBoard();
-            setTimeout(() => this.removeMatches(matches), 300);
+            setTimeout(() => this.removeMatches(matches), this.SWAP_DELAY);
         } else {
             // 无匹配，恢复交换
             [this.board[y1][x1], this.board[y2][x2]] = [this.board[y2][x2], this.board[y1][x1]];
@@ -2028,34 +1790,37 @@ class MatchThreeGame {
     }
 
     /**
-     * 查找所有匹配的宝石（三个或更多相同宝石连成一线）
+     * 查找所有匹配的宝石（MATCH_MIN 个或更多相同宝石连成一线）
      * @returns {string[]} - 匹配位置数组（格式："x,y"）
      */
     findMatches() {
         const matches = new Set();
-        
+        const last = this.GRID_SIZE - 2; // 检测三连只需要到倒数第3列/行
+
         // 检查水平匹配
-        for (let y = 0; y < 6; y++) {
-            for (let x = 0; x < 4; x++) {
-                if (this.board[y][x] === this.board[y][x+1] && this.board[y][x] === this.board[y][x+2]) {
+        for (let y = 0; y < this.GRID_SIZE; y++) {
+            for (let x = 0; x < last; x++) {
+                if (this.board[y][x] === this.board[y][x+1]
+                    && this.board[y][x] === this.board[y][x+2]) {
                     matches.add(`${x},${y}`);
                     matches.add(`${x+1},${y}`);
                     matches.add(`${x+2},${y}`);
                 }
             }
         }
-        
+
         // 检查垂直匹配
-        for (let x = 0; x < 6; x++) {
-            for (let y = 0; y < 4; y++) {
-                if (this.board[y][x] === this.board[y+1][x] && this.board[y][x] === this.board[y+2][x]) {
+        for (let x = 0; x < this.GRID_SIZE; x++) {
+            for (let y = 0; y < last; y++) {
+                if (this.board[y][x] === this.board[y+1][x]
+                    && this.board[y][x] === this.board[y+2][x]) {
                     matches.add(`${x},${y}`);
                     matches.add(`${x},${y+1}`);
                     matches.add(`${x},${y+2}`);
                 }
             }
         }
-        
+
         return Array.from(matches);
     }
 
@@ -2064,28 +1829,26 @@ class MatchThreeGame {
      * @param {string[]} matches - 匹配位置数组
      */
     removeMatches(matches) {
-        // 更新得分（每个宝石10分）
-        this.score += matches.length * 10;
+        // 更新得分
+        this.score += matches.length * this.SCORE_PER_GEM;
         document.getElementById('matchScore').textContent = this.score;
-        
-        // 标记匹配的宝石为null
-        matches.forEach(pos => {
+
+        // 标记匹配的宝石为 null
+        for (const pos of matches) {
             const [x, y] = pos.split(',').map(Number);
             this.board[y][x] = null;
-        });
-        
+        }
+
         // 让宝石下落
         this.dropGems();
-        
         // 填充空位
         this.fillBoard();
-        
         this.renderBoard();
-        
-        // 检查是否有新的匹配（连锁反应）
+
+        // 链式反应：检查是否产生新匹配
         const newMatches = this.findMatches();
         if (newMatches.length > 0) {
-            setTimeout(() => this.removeMatches(newMatches), 300);
+            setTimeout(() => this.removeMatches(newMatches), this.SWAP_DELAY);
         }
     }
 
@@ -2093,10 +1856,10 @@ class MatchThreeGame {
      * 让宝石下落填补空位
      */
     dropGems() {
-        for (let x = 0; x < 6; x++) {
+        for (let x = 0; x < this.GRID_SIZE; x++) {
             let emptySpaces = 0;
             // 从底部向上遍历
-            for (let y = 5; y >= 0; y--) {
+            for (let y = this.GRID_SIZE - 1; y >= 0; y--) {
                 if (this.board[y][x] === null) {
                     emptySpaces++;
                 } else if (emptySpaces > 0) {
@@ -2112,8 +1875,8 @@ class MatchThreeGame {
      * 填充面板上空位的宝石
      */
     fillBoard() {
-        for (let y = 0; y < 6; y++) {
-            for (let x = 0; x < 6; x++) {
+        for (let y = 0; y < this.GRID_SIZE; y++) {
+            for (let x = 0; x < this.GRID_SIZE; x++) {
                 if (this.board[y][x] === null) {
                     this.board[y][x] = this.gems[Math.floor(Math.random() * this.gems.length)];
                 }
