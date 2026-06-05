@@ -481,6 +481,7 @@ class SnakeGame {
 /**
  * 俄罗斯方块游戏类
  * 使用Canvas绘制，支持键盘控制方块移动和旋转
+ * 优化版：使用requestAnimationFrame实现流畅动画
  */
 class TetrisGame {
     /**
@@ -491,38 +492,52 @@ class TetrisGame {
         this.ctx = this.canvas.getContext('2d');
 
         // ===== 常量定义（便于维护与调整）=====
-        this.GRID_SIZE = 30;    // 每个格子的大小（像素）
-        this.COLS = 10;         // 面板列数
-        this.ROWS = 20;         // 面板行数
-        this.MAX_DROP_INTERVAL = 500;  // 起始下落间隔（毫秒）
-        this.MIN_DROP_INTERVAL = 100;  // 最快下落间隔（毫秒）
+        this.GRID_SIZE = 30;           // 每个格子的大小（像素）
+        this.COLS = 10;                // 面板列数
+        this.ROWS = 20;                // 面板行数
+        this.MAX_DROP_INTERVAL = 800;  // 起始下落间隔（毫秒）
+        this.MIN_DROP_INTERVAL = 80;   // 最快下落间隔（毫秒）
         this.SPEED_STEP = 50;          // 每升一级减少的间隔（毫秒）
         this.SCORE_PER_LINE = 100;     // 每消除一行基础得分
         this.SCORE_PER_LEVEL = 500;    // 升级所需累计分数
-        this.BG_COLOR = '#1a1a1a';     // 画布背景色
+        this.BG_COLOR = '#1a1a2e';     // 画布背景色
+        this.GRID_COLOR = '#16213e';   // 网格线颜色
+        this.CLEAR_ANIM_FRAMES = 6;    // 消行动画帧数
+        this.LOCK_DELAY = 100;         // 方块锁定延迟（毫秒）
 
-        this.board = [];      // 游戏面板
-        this.score = 0;       // 当前得分
-        this.level = 1;       // 当前等级
+        this.board = [];                // 游戏面板
+        this.score = 0;                 // 当前得分
+        this.level = 1;                 // 当前等级
 
         // 七种标准俄罗斯方块形状（I、O、T、L、J、Z、S）
         // 颜色顺序与形状顺序一一对应
         this.PIECES = [
-            { shape: [[1,1,1,1]],                 color: '#00f0f0' }, // I形
-            { shape: [[1,1],[1,1]],               color: '#f0f000' }, // O形
-            { shape: [[1,1,1],[0,1,0]],           color: '#a000f0' }, // T形
-            { shape: [[1,1,1],[1,0,0]],           color: '#f0a000' }, // L形
-            { shape: [[1,1,1],[0,0,1]],           color: '#0000f0' }, // J形
-            { shape: [[1,1,0],[0,1,1]],           color: '#f00000' }, // Z形
-            { shape: [[0,1,1],[1,1,0]],           color: '#00f000' }  // S形
+            { shape: [[1,1,1,1]],                 color: '#00d4ff' }, // I形 - 青色
+            { shape: [[1,1],[1,1]],               color: '#ffd700' }, // O形 - 金色
+            { shape: [[1,1,1],[0,1,0]],           color: '#a855f7' }, // T形 - 紫色
+            { shape: [[1,1,1],[1,0,0]],           color: '#f97316' }, // L形 - 橙色
+            { shape: [[1,1,1],[0,0,1]],           color: '#3b82f6' }, // J形 - 蓝色
+            { shape: [[1,1,0],[0,1,1]],           color: '#ef4444' }, // Z形 - 红色
+            { shape: [[0,1,1],[1,1,0]],           color: '#22c55e' }  // S形 - 绿色
         ];
 
-        this.currentPiece = null;    // 当前方块形状矩阵
-        this.currentColor = '';      // 当前方块颜色
+        this.currentPiece = null;      // 当前方块形状矩阵
+        this.currentColor = '';        // 当前方块颜色
         this.currentPos = {x: 0, y: 0}; // 当前方块位置（左上角）
-        this.gameRunning = false;    // 游戏是否正在运行
-        this.gameLoop = null;        // 游戏循环定时器
+        this.gameRunning = false;      // 游戏是否正在运行
+        this.lastDropTime = 0;         // 上次下落时间戳
+        this.animationId = null;       // requestAnimationFrame ID
         this.keyHandler = (e) => this.handleKeyDown(e);
+        
+        // 消行动画状态
+        this.clearingLines = false;    // 是否正在消除
+        this.linesToClear = [];        // 待消除的行索引
+        this.clearAnimFrame = 0;       // 当前消行动画帧
+        
+        // 方块锁定状态
+        this.lockPending = false;      // 是否等待锁定
+        this.lockTime = 0;             // 锁定开始时间
+        
         this.init();
     }
 
@@ -536,16 +551,18 @@ class TetrisGame {
 
     /**
      * 处理键盘事件
-     * ← → 移动方块，↑ 旋转方块，↓ 加速下落
+     * ← → 移动方块，↑ 旋转方块，↓ 加速下落，空格硬降落
      * @param {KeyboardEvent} e - 键盘事件对象
      */
     handleKeyDown(e) {
-        if (!this.gameRunning) return;
+        if (!this.gameRunning || this.clearingLines) return;
+        
         const actionMap = {
             ArrowLeft:  () => this.movePiece(-1, 0),  // 左移
             ArrowRight: () => this.movePiece(1, 0),   // 右移
             ArrowDown:  () => this.movePiece(0, 1),   // 下移
-            ArrowUp:    () => this.rotatePiece()      // 旋转
+            ArrowUp:    () => this.rotatePiece(),     // 旋转
+            ' ':        () => this.hardDrop()         // 硬降落
         };
         const action = actionMap[e.key];
         if (action) {
@@ -564,14 +581,6 @@ class TetrisGame {
     }
 
     /**
-     * 启动（或重启）下落定时器
-     */
-    startDropTimer() {
-        clearInterval(this.gameLoop);
-        this.gameLoop = setInterval(() => this.update(), this.getDropInterval());
-    }
-
-    /**
      * 开始新游戏
      */
     startGame() {
@@ -580,10 +589,55 @@ class TetrisGame {
         this.score = 0;
         this.level = 1;
         this.gameRunning = true;
+        this.lastDropTime = performance.now();
+        this.clearingLines = false;
+        this.linesToClear = [];
+        this.clearAnimFrame = 0;
+        this.lockPending = false;
+        
         document.getElementById('tetrisScore').textContent = this.score;
         document.getElementById('tetrisLevel').textContent = this.level;
         this.spawnPiece();
-        this.startDropTimer();
+        this.gameLoop();
+    }
+
+    /**
+     * 游戏主循环（使用requestAnimationFrame实现流畅动画）
+     */
+    gameLoop() {
+        if (!this.gameRunning) return;
+        
+        const now = performance.now();
+        
+        // 消行动画处理
+        if (this.clearingLines) {
+            this.clearAnimFrame++;
+            if (this.clearAnimFrame >= this.CLEAR_ANIM_FRAMES) {
+                // 动画结束，执行实际消除
+                this.performLineClear();
+                this.clearingLines = false;
+                this.linesToClear = [];
+                this.clearAnimFrame = 0;
+                this.spawnPiece();
+            }
+        }
+        // 方块锁定延迟处理
+        else if (this.lockPending) {
+            if (now - this.lockTime >= this.LOCK_DELAY) {
+                this.lockPiece();
+            }
+        }
+        // 正常下落处理
+        else {
+            const dropInterval = this.getDropInterval();
+            if (now - this.lastDropTime >= dropInterval) {
+                this.movePiece(0, 1);
+                this.lastDropTime = now;
+            }
+        }
+        
+        this.draw();
+        this.animationId = requestAnimationFrame(() => this.gameLoop());
     }
 
     /**
@@ -605,7 +659,6 @@ class TetrisGame {
         if (this.checkCollision()) {
             this.gameOver();
         }
-        this.draw();
     }
 
     /**
@@ -614,6 +667,8 @@ class TetrisGame {
      * @param {number} dy - y方向移动量
      */
     movePiece(dx, dy) {
+        if (this.clearingLines || this.lockPending) return;
+        
         this.currentPos.x += dx;
         this.currentPos.y += dy;
         
@@ -621,31 +676,61 @@ class TetrisGame {
         if (this.checkCollision()) {
             this.currentPos.x -= dx;
             this.currentPos.y -= dy;
-            // 如果是向下移动时碰撞，锁定方块
+            // 如果是向下移动时碰撞，进入锁定延迟
             if (dy > 0) {
-                this.lockPiece();
+                this.lockPending = true;
+                this.lockTime = performance.now();
             }
         }
-        this.draw();
+    }
+
+    /**
+     * 硬降落：方块直接落到底部
+     */
+    hardDrop() {
+        if (this.clearingLines || this.lockPending) return;
+        
+        while (!this.checkCollision()) {
+            this.currentPos.y++;
+            this.score += 2;  // 硬降落加分
+        }
+        this.currentPos.y--;
+        this.lockPiece();
     }
 
     /**
      * 旋转方块（顺时针90度）
      */
     rotatePiece() {
-        if (!this.currentPiece) return;
+        if (!this.currentPiece || this.clearingLines || this.lockPending) return;
+        
         const oldPiece = this.currentPiece.map(row => [...row]);
+        const oldPos = { ...this.currentPos };
         
         // 矩阵转置并反转每行实现顺时针旋转
         this.currentPiece = this.currentPiece[0].map((_, i) =>
             this.currentPiece.map(row => row[i]).reverse()
         );
         
-        // 如果旋转后碰撞，恢复原来的形状
-        if (this.checkCollision()) {
-            this.currentPiece = oldPiece;
+        // 尝试墙踢（wall kick）：如果旋转后碰撞，尝试左右偏移
+        const kicks = [0, -1, 1, -2, 2];
+        let valid = !this.checkCollision();
+        
+        if (!valid) {
+            for (const kick of kicks) {
+                this.currentPos.x = oldPos.x + kick;
+                if (!this.checkCollision()) {
+                    valid = true;
+                    break;
+                }
+            }
         }
-        this.draw();
+        
+        // 如果所有偏移都无效，恢复原来的形状和位置
+        if (!valid) {
+            this.currentPiece = oldPiece;
+            this.currentPos = oldPos;
+        }
     }
 
     /**
@@ -673,6 +758,8 @@ class TetrisGame {
      * 将当前方块固定到面板上
      */
     lockPiece() {
+        this.lockPending = false;
+        
         for (let y = 0; y < this.currentPiece.length; y++) {
             for (let x = 0; x < this.currentPiece[y].length; x++) {
                 if (this.currentPiece[y][x]) {
@@ -680,41 +767,50 @@ class TetrisGame {
                 }
             }
         }
-        this.clearLines();  // 清除完整行
-        this.spawnPiece();  // 生成新方块
+        
+        // 检查并准备消除行（带动画）
+        const fullLines = this.findFullLines();
+        if (fullLines.length > 0) {
+            this.clearingLines = true;
+            this.linesToClear = fullLines;
+            this.clearAnimFrame = 0;
+        } else {
+            this.spawnPiece();
+        }
     }
 
     /**
-     * 清除完整的行并更新得分和等级
+     * 查找所有完整的行
+     * @returns {number[]} - 完整行的索引数组
      */
-    clearLines() {
-        let linesCleared = 0;
-        // 从底部向上检查每一行
+    findFullLines() {
+        const lines = [];
         for (let y = this.ROWS - 1; y >= 0; y--) {
             if (this.board[y].every(cell => cell !== null)) {
-                this.board.splice(y, 1);           // 删除该行
-                this.board.unshift(Array(this.COLS).fill(null)); // 在顶部添加空行
-                linesCleared++;
-                y++; // 重新检查当前行（因为上面的行已经下移）
+                lines.push(y);
             }
         }
-
-        if (linesCleared > 0) {
-            // 得分 = 消除行数 × 基础分 × 消除行数（连消加分）
-            this.score += linesCleared * this.SCORE_PER_LINE * linesCleared;
-            this.level = Math.floor(this.score / this.SCORE_PER_LEVEL) + 1;
-            document.getElementById('tetrisScore').textContent = this.score;
-            document.getElementById('tetrisLevel').textContent = this.level;
-            // 更新游戏速度（应用新等级的下落间隔）
-            this.startDropTimer();
-        }
+        return lines;
     }
 
     /**
-     * 游戏主循环：方块自动下落
+     * 执行实际的行消除操作
      */
-    update() {
-        this.movePiece(0, 1);
+    performLineClear() {
+        // 从底部向上消除，保持索引正确
+        this.linesToClear.sort((a, b) => b - a);
+        
+        for (const y of this.linesToClear) {
+            this.board.splice(y, 1);
+            this.board.unshift(Array(this.COLS).fill(null));
+        }
+        
+        const linesCleared = this.linesToClear.length;
+        // 得分 = 消除行数 × 基础分 × 消除行数（连消加分）
+        this.score += linesCleared * this.SCORE_PER_LINE * linesCleared;
+        this.level = Math.floor(this.score / this.SCORE_PER_LEVEL) + 1;
+        document.getElementById('tetrisScore').textContent = this.score;
+        document.getElementById('tetrisLevel').textContent = this.level;
     }
 
     /**
@@ -724,33 +820,102 @@ class TetrisGame {
         // 清空画布（深色背景）
         this.ctx.fillStyle = this.BG_COLOR;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // 绘制网格线
+        this.drawGrid();
 
-        // 绘制已固定的方块
+        // 绘制已固定的方块（包含消行动画效果）
+        this.drawBoard();
+
+        // 绘制当前活动方块
+        this.drawCurrentPiece();
+    }
+
+    /**
+     * 绘制网格线
+     */
+    drawGrid() {
+        this.ctx.strokeStyle = this.GRID_COLOR;
+        this.ctx.lineWidth = 1;
+        
+        // 绘制垂直线
+        for (let x = 0; x <= this.COLS; x++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(x * this.GRID_SIZE, 0);
+            this.ctx.lineTo(x * this.GRID_SIZE, this.canvas.height);
+            this.ctx.stroke();
+        }
+        
+        // 绘制水平线
+        for (let y = 0; y <= this.ROWS; y++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, y * this.GRID_SIZE);
+            this.ctx.lineTo(this.canvas.width, y * this.GRID_SIZE);
+            this.ctx.stroke();
+        }
+    }
+
+    /**
+     * 绘制已固定的方块
+     */
+    drawBoard() {
         for (let y = 0; y < this.ROWS; y++) {
             for (let x = 0; x < this.COLS; x++) {
                 if (this.board[y][x]) {
-                    this.ctx.fillStyle = this.board[y][x];
-                    this.ctx.fillRect(x * this.GRID_SIZE, y * this.GRID_SIZE, this.GRID_SIZE - 1, this.GRID_SIZE - 1);
+                    // 检查是否在消行中，如果是则添加闪烁效果
+                    const isClearing = this.clearingLines && this.linesToClear.includes(y);
+                    const alpha = isClearing ? Math.sin(this.clearAnimFrame * Math.PI / 3) * 0.5 + 0.5 : 1;
+                    
+                    this.ctx.globalAlpha = alpha;
+                    this.drawBlock(x, y, this.board[y][x]);
+                    this.ctx.globalAlpha = 1;
                 }
             }
         }
+    }
 
-        // 绘制当前活动方块
-        if (this.currentPiece) {
-            this.ctx.fillStyle = this.currentColor;
-            for (let y = 0; y < this.currentPiece.length; y++) {
-                for (let x = 0; x < this.currentPiece[y].length; x++) {
-                    if (this.currentPiece[y][x]) {
-                        this.ctx.fillRect(
-                            (this.currentPos.x + x) * this.GRID_SIZE,
-                            (this.currentPos.y + y) * this.GRID_SIZE,
-                            this.GRID_SIZE - 1,
-                            this.GRID_SIZE - 1
-                        );
-                    }
+    /**
+     * 绘制当前活动方块
+     */
+    drawCurrentPiece() {
+        if (!this.currentPiece) return;
+        
+        this.ctx.globalAlpha = 1;
+        for (let y = 0; y < this.currentPiece.length; y++) {
+            for (let x = 0; x < this.currentPiece[y].length; x++) {
+                if (this.currentPiece[y][x]) {
+                    this.drawBlock(this.currentPos.x + x, this.currentPos.y + y, this.currentColor);
                 }
             }
         }
+    }
+
+    /**
+     * 绘制单个方块（带立体效果）
+     * @param {number} x - 列坐标
+     * @param {number} y - 行坐标
+     * @param {string} color - 方块颜色
+     */
+    drawBlock(x, y, color) {
+        const px = x * this.GRID_SIZE;
+        const py = y * this.GRID_SIZE;
+        const size = this.GRID_SIZE - 2;
+        
+        // 绘制主方块
+        this.ctx.fillStyle = color;
+        this.ctx.fillRect(px + 1, py + 1, size, size);
+        
+        // 绘制高光效果
+        const gradient = this.ctx.createLinearGradient(px, py, px + size, py + size);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(px + 1, py + 1, size, size);
+        
+        // 绘制边框
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeRect(px + 1, py + 1, size, size);
     }
 
     /**
@@ -758,8 +923,12 @@ class TetrisGame {
      */
     gameOver() {
         this.gameRunning = false;
-        clearInterval(this.gameLoop);
-        alert(`游戏结束！得分：${this.score}`);
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+        setTimeout(() => {
+            alert(`游戏结束！得分：${this.score}`);
+        }, 100);
     }
 
     /**
@@ -767,6 +936,9 @@ class TetrisGame {
      */
     removeEventListeners() {
         document.removeEventListener('keydown', this.keyHandler);
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
     }
 }
 
